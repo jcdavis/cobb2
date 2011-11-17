@@ -242,8 +242,7 @@ dline_result dline_remove(dline_t* existing,
                       unsigned int start,
                       unsigned int total_len) {
   
-  dline_t* new_dline = NULL;
-  dline_entry* current = (dline_entry*)*result;
+  dline_entry* current = (dline_entry*)existing;
   uint64_t before_size, deleted_size, after_size = 0;
   unsigned int suffix_len = total_len-start;
   
@@ -274,6 +273,7 @@ dline_result dline_remove(dline_t* existing,
   if(before_size == 0 && after_size == 0) {
     /* If the deleted suffix is the only entry, no need to malloc a new one.
      */
+    *result = NULL;
     return NO_ERROR;
   }
   
@@ -334,7 +334,13 @@ int dline_search(dline_t* dline,
  */
 void dline_debug(dline_t* dline) {
   dline_entry* current = (dline_entry*)dline;
-  printf("dline at 0x%llx\n", (uint64_t)current); 
+  printf("dline at 0x%llx\n", (uint64_t)current);
+  
+  if(dline == NULL) {
+    printf("pointer is null, no entries here\n");
+    return;
+  }
+  
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR) {
     /* bs required to add a null terminator, else we would have to scanf
      * the printf string to add precision since the length isn't known in
