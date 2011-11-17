@@ -59,19 +59,19 @@ static inline char* str_offset(dline_entry* entry) {
  * If the current dline is null, this just creates a new dline with the
  * new element in it. Returns NULL on failure
  */
-dline* dline_upsert(dline* existing, /* dline to perform upset on*/
-                   char* string, /* full null-terminated string to upsert */
-                   unsigned int start, /*byte offset from start of string*/
-                   unsigned int total_len, /*NOT including null terminator*/
-                   char** global_ptr, /* will be created if first insert*/
-                   int score, /* score to set for upsert */
-                   short* dline_upsert_mode, /* also set on first call*/
-                   int* old_score) { /*set if the first call is an update */
+dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
+                      dline_t** result, /* resulting dline*/
+                      char* string,/*full null-terminated string to upsert*/
+                      unsigned int start,/*offset from start of string*/
+                      unsigned int total_len,/*NOT including \0 terminator*/
+                      char** global_ptr,/* will be created if first insert*/
+                      int score,/* score to set for upsert */
+                      short* dline_upsert_mode,/* also set on first call*/
+                      int* old_score) {/*set if call is an update*/
   if(string == NULL)
-    return NULL;
+    return BAD_PARAM;
   
-  dline* new_dline = NULL;
-  unsigned int new_str_len = total_len-start;
+  unsigned int suffix_len = total_len-start;
   
   
   if(existing == NULL) {
@@ -81,10 +81,10 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
     /* Create the new dline for this suffix plus space for the trailing
      * magic terminator pointer.
      */
-    new_dline = (dline*)malloc(entry_size(new_str_len) + sizeof(void*));
+    *result = (dline_t*)malloc(entry_size(suffix_len) + sizeof(void*));
     
-    if(new_dline == NULL) {
-      return NULL;
+    if(*result == NULL) {
+      return MALLOC_FAIL;
     }
     
     if(*global_ptr == NULL) {
@@ -93,24 +93,27 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
       *global_ptr = malloc(total_len+1);
       
       if(*global_ptr == NULL) {
-        free(new_dline);
-        return NULL;
+        free(*result);
+        return MALLOC_FAIL;
       }
       
       strncpy(*global_ptr, string, total_len + 1);
     }
     
-    dline_entry* new_entry = (dline_entry*)new_dline;
+    dline_entry* new_entry = (dline_entry*)*result;
     
-    /*set up our new dline*/
+    /*set up our new dline_t*/
     new_entry->global_ptr = *global_ptr;
     new_entry->score = score;
-    new_entry->len = new_str_len;
-    memcpy(str_offset(new_entry), string+start, new_str_len);
+    new_entry->len = suffix_len;
+    memcpy(str_offset(new_entry), string+start, suffix_len);
     /*trailing magic pointer to indicate end of a dline.*/
     next_entry(new_entry)->global_ptr = DLINE_MAGIC_TERMINATOR;
     
     *dline_upsert_mode = DLINE_UPSERT_MODE_INSERT;
+    
+    return NO_ERROR;
+    
   } else if(*dline_upsert_mode == DLINE_UPSERT_MODE_INITIAL) {
     /* If we are upserting the first suffix, we don't yet know if this
      * will be an update or insert. Therefore we may need to scan the entire 
@@ -128,7 +131,7 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
      * is unecessary, since finding an identical global_str is enough.
      */
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
-          (strncmp(str_offset(current), string + start, new_str_len) ||
+          (strncmp(str_offset(current), string + start, suffix_len) ||
            strncmp(current->global_ptr, string, total_len))) {
       current = next_entry(current);        
     }
@@ -138,7 +141,8 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
        * efficient way of doing things, but it'll work for now
        */
       *dline_upsert_mode = DLINE_UPSERT_MODE_INSERT;
-      new_dline = dline_upsert(existing, string, start, total_len, global_ptr, score, dline_upsert_mode, old_score);
+      return dline_upsert(existing, result, string, start, total_len,
+                          global_ptr, score, dline_upsert_mode, old_score);
     } else {
       /* ran into a identical suffix with a full string identical to ours,
        * so this is an update. Similar to above, this just recurses for now.
@@ -146,10 +150,12 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
       *dline_upsert_mode = DLINE_UPSERT_MODE_UPDATE;
       *global_ptr = current->global_ptr;
       *old_score = current->score;
-      new_dline = dline_upsert(existing, string, start, total_len,
-                               global_ptr, score, dline_upsert_mode,
-                               old_score);
+      return dline_upsert(existing, result, string, start, total_len, 
+                          global_ptr, score, dline_upsert_mode,
+                          old_score);
     }
+    
+    return NO_ERROR;
     
   } else if(*dline_upsert_mode == DLINE_UPSERT_MODE_INSERT) {
     /* Doing an insert, loop until the first item whose score is <= the new
@@ -158,26 +164,26 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
      */
     
     dline_entry* current = existing;
-    uint64_t before_offset, after_offset = 0;
+    uint64_t before_size, after_size = 0;
     
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
           current->score > score) {
       current = next_entry(current);
     }
     
-    before_offset = (uint64_t)current - (uint64_t)existing;
+    before_size = (uint64_t)current - (uint64_t)existing;
     
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR) {
       current = next_entry(current);
     }
     
-    after_offset = (uint64_t)current - (uint64_t)existing - before_offset;
+    after_size = (uint64_t)current - (uint64_t)existing - before_size;
     
-    new_dline = (dline*)malloc(before_offset + entry_size(new_str_len) +
-                               after_offset + sizeof(void*));
+    *result = (dline_t*)malloc(before_size + entry_size(suffix_len) +
+                               after_size + sizeof(void*));
     
-    if(new_dline == NULL) {
-      return NULL;
+    if(*result == NULL) {
+      return MALLOC_FAIL;
     }
     
     if(*global_ptr == NULL) {
@@ -185,33 +191,34 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
       *global_ptr = malloc(total_len+1);
       
       if(*global_ptr == NULL) {
-        free(new_dline);
-        return NULL;
+        free(*result);
+        return MALLOC_FAIL;
       }
       
       strncpy(*global_ptr, string, total_len + 1);
     }
     
     /*copy over entries before our new entry*/
-    memcpy(new_dline, existing, before_offset);
+    memcpy(*result, existing, before_size);
     
-    dline_entry* new_entry = (dline_entry*)((char*)new_dline +
-                                            before_offset);
+    dline_entry* new_entry = (dline_entry*)((char*)*result +
+                                            before_size);
     
-    /*set up our new dline*/
+    /*set up our new dline_t*/
     new_entry->global_ptr = *global_ptr;
     new_entry->score = score;
-    new_entry->len = new_str_len;
-    memcpy(str_offset(new_entry), string + start, new_str_len);
+    new_entry->len = suffix_len;
+    memcpy(str_offset(new_entry), string + start, suffix_len);
     
     /*copy over entries after our new entry*/
-    memcpy(((char*)new_dline) + before_offset + entry_size(new_str_len),
-           ((char*)existing) + before_offset, after_offset);
+    memcpy(((char*)*result) + before_size + entry_size(suffix_len),
+           ((char*)existing) + before_size, after_size);
     /*termiante with magic (Ugh Ugly)*/
-    ((dline_entry*)((char*)new_dline + before_offset +
-                   entry_size(new_str_len) + after_offset))->global_ptr =
+    ((dline_entry*)((char*)*result + before_size +
+                   entry_size(suffix_len) + after_size))->global_ptr =
                    DLINE_MAGIC_TERMINATOR;
     
+    return NO_ERROR;
   } else if(*dline_upsert_mode == DLINE_UPSERT_MODE_UPDATE) {
     /* If surely doing an update, the previous score has been identified.
      * First seek to the higher of score and old_score, and then the lower.
@@ -220,18 +227,81 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
      */
     assert(*global_ptr != NULL);
     
-    /*TODO: DO THIS*/
-    
-  } /*else invalid mode, just return NULL*/
+    /*TODO: DO THIS, IT SUCKS*/
+    return NO_ERROR;
+  } else {
+    return BAD_PARAM;
+  }
+}
+
+/* Removes a suffix from a dline, returning a copy without the suffix.
+ */
+dline_result dline_remove(dline_t* existing,
+                      dline_t** result,
+                      char* string,
+                      unsigned int start,
+                      unsigned int total_len) {
   
-  return new_dline;
+  dline_t* new_dline = NULL;
+  dline_entry* current = (dline_entry*)*result;
+  uint64_t before_size, deleted_size, after_size = 0;
+  unsigned int suffix_len = total_len-start;
+  
+  /* Room for optimization here: after removing first suffix, we can save
+   * the global_ptr, and then shallow compare the pointers when we delete
+   * other suffixes.
+   */
+  while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
+        (strncmp(str_offset(current), string + start, suffix_len) ||
+         strncmp(current->global_ptr, string, total_len))) {
+    current = next_entry(current);
+  }
+  
+  if(current->global_ptr == DLINE_MAGIC_TERMINATOR) {
+    assert(0); /*shouldn't happen, lets go cry in a corner for now*/
+  }
+  
+  before_size = (uint64_t)current - (uint64_t)existing;
+  deleted_size = entry_size(current->len);
+  
+  while(current->global_ptr != DLINE_MAGIC_TERMINATOR) {
+    current = next_entry(current);
+  }
+  
+  after_size = (uint64_t)current - (uint64_t)existing - deleted_size -
+    before_size;
+  
+  if(before_size == 0 && after_size == 0) {
+    /* If the deleted suffix is the only entry, no need to malloc a new one.
+     */
+    return NO_ERROR;
+  }
+  
+  *result = (dline_t*)malloc(before_size + after_size + sizeof(void*));
+  
+  if(*result == NULL) {
+    return MALLOC_FAIL;
+  }
+  
+  /*copy over entries before the deleted suffix*/
+  memcpy(*result, existing, before_size);
+  
+  /*and now the entries after*/
+  memcpy(((char*)*result) + before_size,
+         ((char*)existing) + before_size + deleted_size,
+         after_size);
+  
+  /*termiante with magic (Ugh Ugly)*/
+  ((dline_entry*)((char*)*result + before_size + after_size))->global_ptr = DLINE_MAGIC_TERMINATOR;
+  
+  return NO_ERROR;
 }
 
 /* Search the given dline for suffixes starting with string[start] and
  * minimum score of min_score. Stores result_size number of entries in
  * results, and returns the number of results stored there.
  */
-int dline_search(dline* dline,
+int dline_search(dline_t* dline,
                  char* string,
                  unsigned int start,
                  unsigned int total_len,
@@ -262,7 +332,7 @@ int dline_search(dline* dline,
 
 /* Simple debugging function which outputs all of the contents of a dline.
  */
-void dline_debug(dline* dline) {
+void dline_debug(dline_t* dline) {
   dline_entry* current = (dline_entry*)dline;
   printf("dline at 0x%llx\n", (uint64_t)current); 
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR) {

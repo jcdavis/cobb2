@@ -1,22 +1,27 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "dline.h"
 
 /*static char* string1 = "Hello World!";
 static char* string2 = "Foo Bar Baz";
 static char* string3 = "42";*/
 
+void file_query(char* fname);
+
 int main(int argc, char** argv) {
   if(argc != 2)
     return 1;
+  file_query(argv[1]);
+}
+
+void file_query(char* fname) {
+  FILE* fp = fopen(fname, "r");
+  char iline[500]; /*please say this is enough*/
   
-  FILE* fp = fopen(argv[1], "r");
-  
-  char iline[500];
-  
-  dline* wtf = NULL;
-  dline* num2 = NULL;
+  dline_t* line1 = NULL;
+  dline_t* line2 = NULL;
   
   int read = 0;
   
@@ -25,34 +30,33 @@ int main(int argc, char** argv) {
     int unused = 0;
     short mode = DLINE_UPSERT_MODE_INITIAL;
     
-    iline[strlen(iline)-1] = '\0';
-    wtf = dline_upsert(num2,
-                       iline,
-                       0,
-                       strlen(iline),
-                       &global_ptr,
-                       (100000-strlen(iline)),
-                       &mode,
-                       &unused);
-    free(num2);
-    num2 = wtf;
+    iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    assert(!dline_upsert(line1,
+                         &line2,
+                         iline,
+                         0,
+                         strlen(iline),
+                         &global_ptr,
+                         (100000-strlen(iline)),
+                         &mode,
+                         &unused));
+    free(line1);
+    line1=line2;
     read++;
   }
   fclose(fp);
   
-  printf("read %d lines.\n Query fun times\n", read);
+  printf("read %d lines.\n Query:\n", read);
   
   dline_entry results[25];
   
   while(fgets(iline, 500, stdin)) {
-    iline[strlen(iline)-1] = '\0';
-    int found = dline_search(wtf, iline, 0, strlen(iline), 0, results, 25);
-    for(int i = 0; i < found; i++) {
+    iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    int num = dline_search(line1, iline, 0, strlen(iline), 0, results, 25);
+    for(int i = 0; i < num; i++) {
       printf("%d %s\n", results[i].score, (char*)results[i].global_ptr);
     }
   }
-  
-  return 0;
 }
 
 /*char* global_ptr = NULL;
