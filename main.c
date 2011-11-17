@@ -27,13 +27,13 @@ int main(int argc, char** argv) {
     
     iline[strlen(iline)-1] = '\0';
     wtf = dline_upsert(num2,
-                              iline,
-                              0,
-                              strlen(iline),
-                              &global_ptr,
-                              (100000-strlen(iline)),
-                              &mode,
-                              &unused);
+                       iline,
+                       0,
+                       strlen(iline),
+                       &global_ptr,
+                       (100000-strlen(iline)),
+                       &mode,
+                       &unused);
     free(num2);
     num2 = wtf;
     read++;
@@ -45,7 +45,8 @@ int main(int argc, char** argv) {
   dline_entry results[25];
   
   while(fgets(iline, 500, stdin)) {
-    int found = dline_search(wtf, iline, 0, strlen(iline)-1, 0, results, 25);
+    iline[strlen(iline)-1] = '\0';
+    int found = dline_search(wtf, iline, 0, strlen(iline), 0, results, 25);
     for(int i = 0; i < found; i++) {
       printf("%d %s\n", results[i].score, (char*)results[i].global_ptr);
     }

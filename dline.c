@@ -220,6 +220,8 @@ dline* dline_upsert(dline* existing, /* dline to perform upset on*/
      */
     assert(*global_ptr != NULL);
     
+    /*TODO: DO THIS*/
+    
   } /*else invalid mode, just return NULL*/
   
   return new_dline;
