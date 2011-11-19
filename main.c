@@ -11,30 +11,37 @@ static char* string3 = "42";
 void file_query(char* fname);
 
 int main(int argc, char** argv) {
-  char* global_ptr = NULL;
+  char *global_ptr1, *global_ptr2, *global_ptr3 = NULL;
   int old_score = 0;
   short mode = DLINE_UPSERT_MODE_INITIAL;
   dline_t* line1 = NULL;
   dline_t* line2 = NULL;
-  /* Yes this leaks memory*/
+
   assert(!dline_upsert(line1, &line2, string1, 2, strlen(string1),
-                       &global_ptr, 9000, &mode, &old_score));
+                       &global_ptr1, 9000, &mode, &old_score));
   mode = DLINE_UPSERT_MODE_INITIAL;
-  global_ptr = NULL;
   assert(!dline_upsert(line2, &line1, string2, 6, strlen(string2),
-                       &global_ptr, 9002, &mode, &old_score));
+                       &global_ptr2, 9002, &mode, &old_score));
+  free(line2);
   mode = DLINE_UPSERT_MODE_INITIAL;
-  global_ptr = NULL;
   assert(!dline_upsert(line1, &line2, string3, 0, strlen(string3),
-                       &global_ptr, 9001, &mode, &old_score));
+                       &global_ptr3, 9001, &mode, &old_score));
+  free(line1);
   dline_debug(line2);
   
   assert(!dline_remove(line2, &line1, string2, 6, strlen(string2)));
+  free(line2);
   dline_debug(line1);
   assert(!dline_remove(line1, &line2, string1, 2, strlen(string1)));
+  free(line1);
   dline_debug(line2);
   assert(!dline_remove(line2, &line1, string3, 0, strlen(string3)));
+  free(line2);
   dline_debug(line1);
+  
+  free(global_ptr1);
+  free(global_ptr2);
+  free(global_ptr3);
 }
 
 void file_query(char* fname) {
