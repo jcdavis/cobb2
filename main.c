@@ -11,7 +11,9 @@ static char* string3 = "42";
 void file_query(char* fname);
 
 int main(int argc, char** argv) {
-  char *global_ptr1, *global_ptr2, *global_ptr3 = NULL;
+  char *global_ptr1 = NULL;
+  char *global_ptr2 = NULL;
+  char *global_ptr3 = NULL;
   int old_score = 0;
   short mode = DLINE_UPSERT_MODE_INITIAL;
   dline_t* line1 = NULL;

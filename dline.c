@@ -151,8 +151,7 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
       *global_ptr = current->global_ptr;
       *old_score = current->score;
       return dline_upsert(existing, result, string, start, total_len, 
-                          global_ptr, score, dline_upsert_mode,
-                          old_score);
+                          global_ptr, score, dline_upsert_mode, old_score);
     }
     
     return NO_ERROR;
