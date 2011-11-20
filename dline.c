@@ -1,9 +1,10 @@
-#include "dline.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <inttypes.h>
+#include "dline.h"
+#include "cobb2.h"
 
 /* Functions that operate on a data line (henceforth shortened dline).
  * The dline is the fundamental storage mechanism for data, it is used as
@@ -27,7 +28,7 @@
 /* Since a real global_ptr is malloc'ed, it is going to be aligned. This is
  * not, so no worries about collision.
  */
-#define DLINE_MAGIC_TERMINATOR (char*)0x0011223344556677UL
+#define DLINE_MAGIC_TERMINATOR (global_data*)0x0011223344556677UL
 
 /* size of the unused buffer between the end of a string and the start
  * of its next dline_entry,
@@ -54,6 +55,16 @@ static inline char* str_offset(dline_entry* entry) {
   return ((char*)entry) + sizeof(dline_entry);
 }
 
+static inline global_data* create_global(char* string, int total_len) {
+  global_data* result = malloc(sizeof(global_data) + total_len + 1);
+  if(result == NULL)
+    return NULL;
+  result->len = total_len;
+  memcpy(GLOBAL_STR(result), string, total_len + 1);
+  
+  return result;
+}
+
 /* Returns a copy of the given dline with the new suffix inserted, or
  * resorted if the suffix is already present
  * If the current dline is null, this just creates a new dline with the
@@ -64,7 +75,7 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                       char* string,/*full null-terminated string to upsert*/
                       unsigned int start,/*offset from start of string*/
                       unsigned int total_len,/*NOT including \0 terminator*/
-                      char** global_ptr,/* will be created if first insert*/
+                      global_data** global_ptr,/* will be created if null*/
                       int score,/* score to set for upsert */
                       short* dline_upsert_mode,/* also set on first call*/
                       int* old_score) {/*set if call is an update*/
@@ -90,14 +101,12 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     if(*global_ptr == NULL) {
       assert(*dline_upsert_mode == DLINE_UPSERT_MODE_INITIAL);
       /*first suffix insert, so create the global_ptr*/
-      *global_ptr = malloc(total_len+1);
+      *global_ptr = create_global(string, total_len);
       
       if(*global_ptr == NULL) {
         free(*result);
         return MALLOC_FAIL;
       }
-      
-      strncpy(*global_ptr, string, total_len + 1);
     }
     
     dline_entry* new_entry = (dline_entry*)*result;
@@ -132,7 +141,7 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
      */
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
           (strncmp(str_offset(current), string + start, suffix_len) ||
-           strncmp(current->global_ptr, string, total_len))) {
+           strncmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
       current = next_entry(current);        
     }
     
@@ -187,14 +196,12 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     
     if(*global_ptr == NULL) {
       /*first suffix insert, so create the global_ptr*/
-      *global_ptr = malloc(total_len+1);
+      *global_ptr = create_global(string, total_len);
       
       if(*global_ptr == NULL) {
         free(*result);
         return MALLOC_FAIL;
       }
-      
-      strncpy(*global_ptr, string, total_len + 1);
     }
     
     /*copy over entries before our new entry*/
@@ -251,7 +258,7 @@ dline_result dline_remove(dline_t* existing,
    */
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
         (strncmp(str_offset(current), string + start, suffix_len) ||
-         strncmp(current->global_ptr, string, total_len))) {
+         strncmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
     current = next_entry(current);
   }
   
@@ -349,7 +356,7 @@ void dline_debug(dline_t* dline) {
     assert(tmp != NULL);
     strncpy(tmp, (char*)current + sizeof(dline_entry), current->len);
     tmp[current->len] = '\0';
-    printf("ptr: %p\nlen: %u\nscr: %u\n[%s]\n", current->global_ptr,
+    printf("ptr: %p\nlen: %u\nscr: %u\n[%s]\n", (void*)current->global_ptr,
                                                  current->len,
                                                  current->score,
                                                  tmp);
