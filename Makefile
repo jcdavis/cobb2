@@ -1,4 +1,4 @@
-CFLAGS=-std=c99 -pedantic -Wall -g
+CFLAGS=-std=c99 -pedantic -Wall -O2 -g
 
 all: cobb2
 

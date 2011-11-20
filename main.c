@@ -4,13 +4,17 @@
 #include <assert.h>
 #include "dline.h"
 
-static char* string1 = "Hello World!";
-static char* string2 = "Foo Bar Baz";
-static char* string3 = "42";
-
 void file_query(char* fname);
 
 int main(int argc, char** argv) {
+  file_query(argv[1]);
+}
+
+void basic_test() {
+  static char* string1 = "Hello World!";
+  static char* string2 = "Foo Bar Baz";
+  static char* string3 = "42";
+  
   char *global_ptr1 = NULL;
   char *global_ptr2 = NULL;
   char *global_ptr3 = NULL;
@@ -18,7 +22,7 @@ int main(int argc, char** argv) {
   short mode = DLINE_UPSERT_MODE_INITIAL;
   dline_t* line1 = NULL;
   dline_t* line2 = NULL;
-
+  
   assert(!dline_upsert(line1, &line2, string1, 2, strlen(string1),
                        &global_ptr1, 9000, &mode, &old_score));
   mode = DLINE_UPSERT_MODE_INITIAL;
@@ -88,36 +92,3 @@ void file_query(char* fname) {
     }
   }
 }
-
-/*char* global_ptr = NULL;
- int old_score = 0;
- short mode = DLINE_UPSERT_MODE_INITIAL;
- dline* result1 = dline_upsert(NULL,
- string1,
- 2,
- strlen(string1),
- &global_ptr,
- 9001,
- &mode,
- &old_score);
- mode = DLINE_UPSERT_MODE_INITIAL;
- global_ptr = NULL;
- dline* result2 = dline_upsert(result1,
- string2,
- 6,
- strlen(string2),
- &global_ptr,
- 9002,
- &mode,
- &old_score);
- mode = DLINE_UPSERT_MODE_INITIAL;
- global_ptr = NULL;
- dline* result3 = dline_upsert(result2,
- string3,
- 0,
- strlen(string3),
- &global_ptr,
- 9000,
- &mode,
- &old_score);
- dline_debug(result3);*/
