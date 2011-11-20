@@ -2,12 +2,15 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include "cobb2.h"
 #include "dline.h"
 
 void file_query(char* fname);
+void basic_test();
 
 int main(int argc, char** argv) {
   file_query(argv[1]);
+  //basic_test();
 }
 
 void basic_test() {
@@ -15,9 +18,9 @@ void basic_test() {
   static char* string2 = "Foo Bar Baz";
   static char* string3 = "42";
   
-  char *global_ptr1 = NULL;
-  char *global_ptr2 = NULL;
-  char *global_ptr3 = NULL;
+  global_data* global_ptr1 = NULL;
+  global_data* global_ptr2 = NULL;
+  global_data* global_ptr3 = NULL;
   int old_score = 0;
   short mode = DLINE_UPSERT_MODE_INITIAL;
   dline_t* line1 = NULL;
@@ -60,7 +63,7 @@ void file_query(char* fname) {
   int read = 0;
   
   while(fgets(iline, 500, fp)) {
-    char* global_ptr = NULL;
+    global_data* global_ptr = NULL;
     int unused = 0;
     short mode = DLINE_UPSERT_MODE_INITIAL;
     
@@ -80,7 +83,7 @@ void file_query(char* fname) {
   }
   fclose(fp);
   
-  printf("read %d lines.\n Query:\n", read);
+  printf("read %d lines. Query:\n", read);
   
   dline_entry results[25];
   
@@ -88,7 +91,8 @@ void file_query(char* fname) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
     int num = dline_search(line1, iline, 0, strlen(iline), 0, results, 25);
     for(int i = 0; i < num; i++) {
-      printf("%d %s\n", results[i].score, (char*)results[i].global_ptr);
+      printf("%d %s\n", results[i].score,
+                        GLOBAL_STR(results[i].global_ptr));
     }
   }
 }
