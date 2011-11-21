@@ -18,23 +18,22 @@ void basic_test() {
   static char* string2 = "Foo Bar Baz";
   static char* string3 = "42";
   
-  global_data* global_ptr1 = NULL;
-  global_data* global_ptr2 = NULL;
-  global_data* global_ptr3 = NULL;
-  int old_score = 0;
-  short mode = DLINE_UPSERT_MODE_INITIAL;
+  upsert_state state1 = {NULL, 0, 0};
+  upsert_state state2 = {NULL, 0, 0};
+  upsert_state state3 = {NULL, 0, 0};
+  short mode = UPSERT_MODE_INITIAL;
   dline_t* line1 = NULL;
   dline_t* line2 = NULL;
   
   assert(!dline_upsert(line1, &line2, string1, 2, strlen(string1),
-                       &global_ptr1, 9000, &mode, &old_score));
-  mode = DLINE_UPSERT_MODE_INITIAL;
+                       9000, &state1));
+  mode = UPSERT_MODE_INITIAL;
   assert(!dline_upsert(line2, &line1, string2, 6, strlen(string2),
-                       &global_ptr2, 9002, &mode, &old_score));
+                       9002, &state2));
   free(line2);
-  mode = DLINE_UPSERT_MODE_INITIAL;
+  mode = UPSERT_MODE_INITIAL;
   assert(!dline_upsert(line1, &line2, string3, 0, strlen(string3),
-                       &global_ptr3, 9001, &mode, &old_score));
+                       9001, &state3));
   free(line1);
   dline_debug(line2);
   
@@ -48,9 +47,6 @@ void basic_test() {
   free(line2);
   dline_debug(line1);
   
-  free(global_ptr1);
-  free(global_ptr2);
-  free(global_ptr3);
 }
 
 void file_query(char* fname) {
@@ -63,9 +59,7 @@ void file_query(char* fname) {
   int read = 0;
   
   while(fgets(iline, 500, fp)) {
-    global_data* global_ptr = NULL;
-    int unused = 0;
-    short mode = DLINE_UPSERT_MODE_INITIAL;
+    upsert_state state = {NULL,0,0};
     
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
     assert(!dline_upsert(line1,
@@ -73,10 +67,8 @@ void file_query(char* fname) {
                          iline,
                          0,
                          strlen(iline),
-                         &global_ptr,
                          (100000-strlen(iline)),
-                         &mode,
-                         &unused));
+                         &state));
     free(line1);
     line1=line2;
     read++;

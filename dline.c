@@ -70,15 +70,13 @@ static inline global_data* create_global(char* string, int total_len) {
  * If the current dline is null, this just creates a new dline with the
  * new element in it. Returns NULL on failure
  */
-dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
+op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                       dline_t** result, /* resulting dline*/
                       char* string,/*full null-terminated string to upsert*/
                       unsigned int start,/*offset from start of string*/
                       unsigned int total_len,/*NOT including \0 terminator*/
-                      global_data** global_ptr,/* will be created if null*/
-                      int score,/* score to set for upsert */
-                      short* dline_upsert_mode,/* also set on first call*/
-                      int* old_score) {/*set if call is an update*/
+                      int score, /*score to set*/
+                      upsert_state* state) {/*set on first call*/
   if(string == NULL)
     return BAD_PARAM;
   
@@ -87,7 +85,7 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
   
   if(existing == NULL) {
     /*if the dline is NULL, we can't possibily be doing an update*/
-    assert(*dline_upsert_mode != DLINE_UPSERT_MODE_UPDATE);
+    assert(state->mode != UPSERT_MODE_UPDATE);
     
     /* Create the new dline for this suffix plus space for the trailing
      * magic terminator pointer.
@@ -98,12 +96,12 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
       return MALLOC_FAIL;
     }
     
-    if(*global_ptr == NULL) {
-      assert(*dline_upsert_mode == DLINE_UPSERT_MODE_INITIAL);
+    if(state->global_ptr == NULL) {
+      assert(state->mode == UPSERT_MODE_INITIAL);
       /*first suffix insert, so create the global_ptr*/
-      *global_ptr = create_global(string, total_len);
+      state->global_ptr = create_global(string, total_len);
       
-      if(*global_ptr == NULL) {
+      if(state->global_ptr == NULL) {
         free(*result);
         return MALLOC_FAIL;
       }
@@ -112,25 +110,25 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     dline_entry* new_entry = (dline_entry*)*result;
     
     /*set up our new dline_t*/
-    new_entry->global_ptr = *global_ptr;
+    new_entry->global_ptr = state->global_ptr;
     new_entry->score = score;
     new_entry->len = suffix_len;
     memcpy(str_offset(new_entry), string+start, suffix_len);
     /*trailing magic pointer to indicate end of a dline.*/
     next_entry(new_entry)->global_ptr = DLINE_MAGIC_TERMINATOR;
     
-    *dline_upsert_mode = DLINE_UPSERT_MODE_INSERT;
+    state->mode = UPSERT_MODE_INSERT;
     
     return NO_ERROR;
     
-  } else if(*dline_upsert_mode == DLINE_UPSERT_MODE_INITIAL) {
+  } else if(state->mode == UPSERT_MODE_INITIAL) {
     /* If we are upserting the first suffix, we don't yet know if this
      * will be an update or insert. Therefore we may need to scan the entire 
      * dline to see if a global string already exists, and if so what 
      * it's existing score is. Further suffix upserts will know which 
      * operation to perform, which saves us some comparisons.
      */
-    assert(*global_ptr == NULL);
+    assert(state->global_ptr == NULL);
     
     dline_entry* current = existing;
     
@@ -149,23 +147,23 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
       /* We didn't find an entry, do an insert. Re-looping isn't the most
        * efficient way of doing things, but it'll work for now
        */
-      *dline_upsert_mode = DLINE_UPSERT_MODE_INSERT;
+      state->mode = UPSERT_MODE_INSERT;
       return dline_upsert(existing, result, string, start, total_len,
-                          global_ptr, score, dline_upsert_mode, old_score);
+                          score, state);
     } else {
       /* ran into a identical suffix with a full string identical to ours,
        * so this is an update. Similar to above, this just recurses for now.
        */
-      *dline_upsert_mode = DLINE_UPSERT_MODE_UPDATE;
-      *global_ptr = current->global_ptr;
-      *old_score = current->score;
+      state->mode = UPSERT_MODE_UPDATE;
+      state->global_ptr = current->global_ptr;
+      state->old_score = current->score;
       return dline_upsert(existing, result, string, start, total_len, 
-                          global_ptr, score, dline_upsert_mode, old_score);
+                          score, state);
     }
     
     return NO_ERROR;
     
-  } else if(*dline_upsert_mode == DLINE_UPSERT_MODE_INSERT) {
+  } else if(state->mode == UPSERT_MODE_INSERT) {
     /* Doing an insert, loop until the first item whose score is <= the new
      * suffix's score, and then copy the data before, insert the new suffix,
      * and copy the data after.
@@ -194,11 +192,11 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
       return MALLOC_FAIL;
     }
     
-    if(*global_ptr == NULL) {
+    if(state->global_ptr == NULL) {
       /*first suffix insert, so create the global_ptr*/
-      *global_ptr = create_global(string, total_len);
+      state->global_ptr = create_global(string, total_len);
       
-      if(*global_ptr == NULL) {
+      if(state->global_ptr == NULL) {
         free(*result);
         return MALLOC_FAIL;
       }
@@ -211,7 +209,7 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                                             before_size);
     
     /*set up our new dline_t*/
-    new_entry->global_ptr = *global_ptr;
+    new_entry->global_ptr = state->global_ptr;
     new_entry->score = score;
     new_entry->len = suffix_len;
     memcpy(str_offset(new_entry), string + start, suffix_len);
@@ -225,13 +223,13 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                    DLINE_MAGIC_TERMINATOR;
     
     return NO_ERROR;
-  } else if(*dline_upsert_mode == DLINE_UPSERT_MODE_UPDATE) {
+  } else if(state->mode == UPSERT_MODE_UPDATE) {
     /* If surely doing an update, the previous score has been identified.
      * First seek to the higher of score and old_score, and then the lower.
      * Using the found offsets, copy over old dline without the old entry
      * and with the new entry add.
      */
-    assert(*global_ptr != NULL);
+    assert(state->global_ptr != NULL);
     
     /*TODO: DO THIS, IT SUCKS*/
     return NO_ERROR;
@@ -242,7 +240,7 @@ dline_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
 
 /* Removes a suffix from a dline, returning a copy without the suffix.
  */
-dline_result dline_remove(dline_t* existing,
+op_result dline_remove(dline_t* existing,
                       dline_t** result,
                       char* string,
                       unsigned int start,

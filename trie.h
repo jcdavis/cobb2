@@ -1,6 +1,7 @@
 #ifndef _TRIE_H_
 #define _TRIE_H_
 
+#include "cobb2.h"
 #include "dline.h"
 
 #define NUM_BUCKETS 64
@@ -17,4 +18,15 @@ typedef struct hash_node {
   dline_t* entries[NUM_BUCKETS];
 } hash_node;
 
+
+op_result trie_upsert(trie_t* existing,
+                      char* string,
+                      unsigned int start,
+                      unsigned int total_len,
+                      int score);
+
+op_result trie_delete(trie_t* existing,
+                      char* string,
+                      unsigned int start,
+                      unsigned int total_lem);
 #endif
