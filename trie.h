@@ -23,7 +23,8 @@ op_result trie_upsert(trie_t* existing,
                       char* string,
                       unsigned int start,
                       unsigned int total_len,
-                      int score);
+                      int score,
+                      upsert_state* state);
 
 op_result trie_delete(trie_t* existing,
                       char* string,

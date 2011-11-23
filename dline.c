@@ -65,10 +65,9 @@ static inline global_data* create_global(char* string, int total_len) {
   return result;
 }
 
-/* Returns a copy of the given dline with the new suffix inserted, or
- * resorted if the suffix is already present
- * If the current dline is null, this just creates a new dline with the
- * new element in it. Returns NULL on failure
+/* Creates a copy of the given dline with the insert/update applied. If the
+ * existing line is NULL, creates a new one with just the single element.
+ * Returns status code of the operation.
  */
 op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                       dline_t** result, /* resulting dline*/
@@ -238,7 +237,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
   }
 }
 
-/* Removes a suffix from a dline, returning a copy without the suffix.
+/* Removes a suffix from a dline, returns a result code
  */
 op_result dline_remove(dline_t* existing,
                       dline_t** result,
