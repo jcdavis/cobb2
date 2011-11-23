@@ -237,7 +237,8 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
   }
 }
 
-/* Removes a suffix from a dline, returns a result code
+/* Removes a suffix from a dline by creating a copy without the removed
+ * elements, and returns a result code
  */
 op_result dline_remove(dline_t* existing,
                       dline_t** result,
