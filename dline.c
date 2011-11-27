@@ -76,7 +76,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                       unsigned int total_len,/*NOT including \0 terminator*/
                       int score, /*score to set*/
                       upsert_state* state) {/*set on first call*/
-  if(string == NULL)
+  if(string == NULL || result == NULL || state == NULL)
     return BAD_PARAM;
   
   unsigned int suffix_len = total_len-start;
@@ -137,8 +137,10 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
      * is unecessary, since finding an identical global_str is enough.
      */
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
-          (strncmp(str_offset(current), string + start, suffix_len) ||
-           strncmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
+          (suffix_len != current->len ||
+           memcmp(str_offset(current), string + start, suffix_len) ||
+           current->global_ptr->len != total_len ||
+           memcmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
       current = next_entry(current);        
     }
     
@@ -245,6 +247,8 @@ op_result dline_remove(dline_t* existing,
                       char* string,
                       unsigned int start,
                       unsigned int total_len) {
+  if(existing == NULL || result == NULL)
+    return BAD_PARAM;
   
   dline_entry* current = (dline_entry*)existing;
   uint64_t before_size, deleted_size, after_size = 0;
@@ -255,8 +259,10 @@ op_result dline_remove(dline_t* existing,
    * other suffixes.
    */
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
-        (strncmp(str_offset(current), string + start, suffix_len) ||
-         strncmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
+        (suffix_len != current->len ||
+         strncmp(str_offset(current), string + start, suffix_len) ||
+         current->global_ptr->len != total_len ||
+         memcmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
     current = next_entry(current);
   }
   
@@ -312,6 +318,9 @@ int dline_search(dline_t* dline,
                  int min_score,
                  dline_entry* results,
                  int result_len) {
+  if(dline == NULL || string == NULL || results == NULL)
+    return 0;
+  
   dline_entry* current = (dline_entry*)dline;
   int num_found = 0;
   unsigned int match_len = total_len-start;
@@ -319,7 +328,7 @@ int dline_search(dline_t* dline,
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
         current->score >= min_score) {
     if(match_len <= current->len &&
-       !strncmp(string+start, str_offset(current), match_len)) {
+       !memcmp(string+start, str_offset(current), match_len)) {
       results[num_found].global_ptr = current->global_ptr;
       results[num_found].score = current->score;
       results[num_found].len = current->len;

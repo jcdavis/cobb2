@@ -34,7 +34,8 @@ op_result trie_upsert(trie_t* existing,
                       unsigned int total_len,
                       int score,
                       upsert_state* state) {
-  assert(existing != NULL);
+  if(existing == NULL || string == NULL || state == NULL)
+    return BAD_PARAM;
   
   int current_start = start;
   trie_t* current_ptr = existing;
@@ -109,7 +110,8 @@ op_result trie_remove(trie_t* existing,
                       char* string,
                       unsigned int start,
                       unsigned int total_len) {
-  assert(existing != NULL);
+  if(existing == NULL || string == NULL)
+    return BAD_PARAM;
   
   int current_start = start;
   trie_t* current_ptr = existing;
