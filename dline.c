@@ -260,7 +260,7 @@ op_result dline_remove(dline_t* existing,
    */
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
         (suffix_len != current->len ||
-         strncmp(str_offset(current), string + start, suffix_len) ||
+         memcmp(str_offset(current), string + start, suffix_len) ||
          current->global_ptr->len != total_len ||
          memcmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
     current = next_entry(current);
