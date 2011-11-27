@@ -5,10 +5,22 @@
 #include "cobb2.h"
 #include "trie.h"
 
+#define NUM_BUCKETS 64
+
+typedef struct trie_node {
+  dline_t* terminated;
+  trie_t* children[256]; /*store type (trie/hash) in lowest bit*/
+} trie_node;
+
+typedef struct hash_node {
+  int size;
+  dline_t* entries[NUM_BUCKETS];
+} hash_node;
+
 #define IS_HASH_NODE(ptr) (((uint64_t)ptr)&1)
 
 /* Because we are doing prefix matching, we can only hash based on the first
- * character
+ * byte. But yea, this is still stupid
  */
 static inline uint64_t hash_idx(char first) {
   return (uint64_t)first%NUM_BUCKETS;
@@ -28,10 +40,16 @@ op_result trie_upsert(trie_t* existing,
   trie_t* current_ptr = existing;
   trie_node* parent_ptr = NULL;
   
+  /* Loop down to either
+   * 1) The trie node where this suffix terminates
+   * 2) the hash node where this suffix goes
+   * 3) an empty hash node where this suffix should go
+   */
   while(current_start < total_len && current_ptr != NULL &&
         !IS_HASH_NODE(current_ptr)) {
     parent_ptr = (trie_node*)current_ptr;
-    current_ptr = ((trie_node*)current_ptr)->children[(int)string[current_start]];
+    current_ptr =
+      ((trie_node*)current_ptr)->children[(int)string[current_start]];
     current_start++;
   }
   
@@ -142,4 +160,12 @@ op_result trie_remove(trie_t* existing,
     }
     return result;
   }
+}
+
+int trie_search(trie_t* trie,
+                char* string,
+                unsigned int total_len,
+                dline_entry* results,
+                int results_len) {
+  return 0;
 }

@@ -4,21 +4,7 @@
 #include "cobb2.h"
 #include "dline.h"
 
-#define NUM_BUCKETS 64
-
 typedef void trie_t;
-
-typedef struct trie_node {
-  dline_t* terminated;
-  void* cache_unused;
-  trie_t* children[256]; /*store type in lowest bit*/
-} trie_node;
-
-typedef struct hash_node {
-  int size;
-  dline_t* entries[NUM_BUCKETS];
-} hash_node;
-
 
 op_result trie_upsert(trie_t* existing,
                       char* string,
@@ -30,5 +16,11 @@ op_result trie_upsert(trie_t* existing,
 op_result trie_remove(trie_t* existing,
                       char* string,
                       unsigned int start,
-                      unsigned int total_lem);
+                      unsigned int total_len);
+
+int trie_search(trie_t* trie,
+                char* string,
+                unsigned int total_len,
+                dline_entry* results,
+                int results_len);
 #endif

@@ -311,7 +311,7 @@ int dline_search(dline_t* dline,
                  unsigned int total_len,
                  int min_score,
                  dline_entry* results,
-                 int result_size) {
+                 int result_len) {
   dline_entry* current = (dline_entry*)dline;
   int num_found = 0;
   unsigned int match_len = total_len-start;
@@ -324,7 +324,7 @@ int dline_search(dline_t* dline,
       results[num_found].score = current->score;
       results[num_found].len = current->len;
       num_found++;
-      if(num_found == result_size)
+      if(num_found == result_len)
         break;
     }
     
