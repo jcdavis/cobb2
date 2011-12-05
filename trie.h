@@ -6,6 +6,8 @@
 
 typedef void trie_t;
 
+trie_t* trie_init();
+
 op_result trie_upsert(trie_t* existing,
                       char* string,
                       unsigned int start,
