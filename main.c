@@ -4,12 +4,14 @@
 #include <assert.h>
 #include "cobb2.h"
 #include "dline.h"
+#include "trie.h"
 
-void file_query(char* fname);
+void file_dline_query(char* fname);
+void file_trie_query(char* fname);
 void basic_test();
 
 int main(int argc, char** argv) {
-  file_query(argv[1]);
+  file_trie_query(argv[1]);
   //basic_test();
 }
 
@@ -49,7 +51,43 @@ void basic_test() {
   
 }
 
-void file_query(char* fname) {
+void file_trie_query(char* fname) {
+  FILE* fp = fopen(fname, "r");
+  char iline[500]; /*please say this is enough*/
+  
+  trie_t* trie = trie_init();
+  
+  int read = 0;
+  
+  while(fgets(iline, 500, fp)) {
+    upsert_state state = {NULL,0,0};
+    
+    iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    assert(!trie_upsert(trie,
+                        iline,
+                        0,
+                        strlen(iline),
+                        (1000-strlen(iline)),
+                        &state));
+    read++;
+  }
+  fclose(fp);
+  
+  printf("read %d lines. Query:\n", read);
+  
+  dline_entry results[25];
+  
+  while(fgets(iline, 500, stdin)) {
+    iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    int num = trie_search(trie, iline, strlen(iline), results, 25);
+    for(int i = 0; i < num; i++) {
+      printf("%d %s\n", results[i].score,
+             GLOBAL_STR(results[i].global_ptr));
+    }
+  }
+}
+
+void file_dline_query(char* fname) {
   FILE* fp = fopen(fname, "r");
   char iline[500]; /*please say this is enough*/
   

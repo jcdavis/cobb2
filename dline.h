@@ -3,6 +3,8 @@
 
 #include "cobb2.h"
 
+#define MIN_SCORE 0
+
 typedef void dline_t;
 
 typedef struct dline_entry {

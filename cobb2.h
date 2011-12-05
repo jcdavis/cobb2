@@ -11,7 +11,8 @@ typedef struct global_data {
 enum op_ret {
   NO_ERROR = 0,
   MALLOC_FAIL = 1,
-  BAD_PARAM = 2
+  BAD_PARAM = 2,
+  NOT_FOUND = 3
 };
 
 typedef unsigned short op_result;

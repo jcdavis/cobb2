@@ -20,9 +20,9 @@
  * The termination of a dline is represented as the start of a dline_entry
  * with a magic global_ptr
  *
- * Suffixes are stored in score sorted order. In actual usage, dlines are
- * immutable: all operations create the a copy of the a dline with the given
- * update applied to them.
+ * Suffixes are stored in score sorted order, and within score by global_ptr.'
+ * In actual usage, dlines are immutable: all operations create the a copy of 
+ * the a dline with the given update applied to them.
  */
  
 /* Since a real global_ptr is malloc'ed, it is going to be aligned. This is
@@ -55,7 +55,7 @@ static inline char* str_offset(dline_entry* entry) {
   return ((char*)entry) + sizeof(dline_entry);
 }
 
-static inline global_data* create_global(char* string, int total_len) {
+static global_data* create_global(char* string, int total_len) {
   global_data* result = malloc(sizeof(global_data) + total_len + 1);
   if(result == NULL)
     return NULL;
@@ -70,12 +70,12 @@ static inline global_data* create_global(char* string, int total_len) {
  * Returns status code of the operation.
  */
 op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
-                      dline_t** result, /* resulting dline*/
-                      char* string,/*full null-terminated string to upsert*/
-                      unsigned int start,/*offset from start of string*/
-                      unsigned int total_len,/*NOT including \0 terminator*/
-                      int score, /*score to set*/
-                      upsert_state* state) {/*set on first call*/
+                       dline_t** result, /* resulting dline*/
+                       char* string,/*full string to upsert*/
+                       unsigned int start,/*offset from start of string*/
+                       unsigned int total_len,/*NOT including an ending \0*/
+                       int score, /*score to set*/
+                       upsert_state* state) {/*set on first call*/
   if(string == NULL || result == NULL || state == NULL)
     return BAD_PARAM;
   
@@ -134,7 +134,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     /* Not sure whether or not comparing the local suffix first ends up
      * being faster, but it should be. Those characters are almost always
      * in cache, and the global string is almost always not. But really, it
-     * is unecessary, since finding an identical global_str is enough.
+     * is unecessary, since finding an identical global string is enough.
      */
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
           (suffix_len != current->len ||
@@ -174,7 +174,8 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     uint64_t before_size, after_size = 0;
     
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
-          current->score > score) {
+          current->score > score &&
+          (uint64_t)current->global_ptr > (uint64_t)state->global_ptr) {
       current = next_entry(current);
     }
     
@@ -267,7 +268,7 @@ op_result dline_remove(dline_t* existing,
   }
   
   if(current->global_ptr == DLINE_MAGIC_TERMINATOR) {
-    assert(0); /*shouldn't happen, lets go cry in a corner for now*/
+    return NOT_FOUND;
   }
   
   before_size = (uint64_t)current - (uint64_t)existing;
@@ -308,7 +309,7 @@ op_result dline_remove(dline_t* existing,
 }
 
 /* Search the given dline for suffixes starting with string[start] and
- * minimum score of min_score. Stores result_size number of entries in
+ * minimum score of min_score. Stores at most result_len number of entries in
  * results, and returns the number of results stored there.
  */
 int dline_search(dline_t* dline,
@@ -323,7 +324,7 @@ int dline_search(dline_t* dline,
   
   dline_entry* current = (dline_entry*)dline;
   int num_found = 0;
-  unsigned int match_len = total_len-start;
+  unsigned int match_len = start >= total_len ? 0 : total_len - start;
   
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
         current->score >= min_score) {
@@ -372,4 +373,15 @@ void dline_debug(dline_t* dline) {
   }
   printf("Total length: %llu\n", (uint64_t)current - (uint64_t)dline +
          sizeof(void*));
+}
+
+/* Print debug information about a results array
+ */
+void dline_entry_debug(dline_entry* data, int size) {
+  printf("for %d entries at %p\n", size, (void*)data);
+  
+  for(int i = 0; i < size; i++) {
+    printf("Global %p score %d len %d\n", (void*)data[i].global_ptr,
+           data[i].score, data[i].len);
+  }
 }
