@@ -13,6 +13,10 @@ typedef struct dline_entry {
   unsigned int len;
 } dline_entry;
 
+typedef void(dline_iter_fn)(dline_entry*, char*, void*);
+
+void dline_iterate(dline_t* dline, void* state, dline_iter_fn function);
+                   
 op_result dline_upsert(dline_t* existing,
                        dline_t** result,
                        char* string,

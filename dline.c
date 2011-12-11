@@ -65,6 +65,20 @@ static global_data* create_global(char* string, int total_len) {
   return result;
 }
 
+/* Apply some function to each element of a dline. Brought out here so
+ * caller don't need to be aware of memory layout.
+ */
+void dline_iterate(dline_t* dline, void* state, dline_iter_fn function) {
+  assert(dline != NULL);
+  
+  dline_entry* current = (dline_entry*)dline;
+  
+  while(current->global_ptr != DLINE_MAGIC_TERMINATOR) {
+    function(current, str_offset(current), state);
+    current = next_entry(current);
+  }
+}
+
 /* Creates a copy of the given dline with the insert/update applied. If the
  * existing line is NULL, creates a new one with just the single element.
  * Returns status code of the operation.
@@ -79,7 +93,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
   if(string == NULL || result == NULL || state == NULL)
     return BAD_PARAM;
   
-  unsigned int suffix_len = total_len-start;
+  unsigned int suffix_len = start >= total_len ? 0 : total_len - start;
   
   
   if(existing == NULL) {
@@ -253,7 +267,7 @@ op_result dline_remove(dline_t* existing,
   
   dline_entry* current = (dline_entry*)existing;
   uint64_t before_size, deleted_size, after_size = 0;
-  unsigned int suffix_len = total_len-start;
+  unsigned int suffix_len = start >= total_len ? 0 : total_len - start;
   
   /* Room for optimization here: after removing first suffix, we can save
    * the global_ptr, and then shallow compare the pointers when we delete
@@ -344,10 +358,32 @@ int dline_search(dline_t* dline,
   return num_found;
 }
 
+/*Iterator function which prints out contents of a single entry in a dline*/
+static void dline_debug_printer(dline_entry* entry,
+                                char* string,
+                                void* state) {
+  /* bs required to add a null terminator, else we would have to scanf
+   * the printf string to add precision since the length isn't known in
+   * advance (even uglier).
+   */
+  char* tmp = (char*)malloc(entry->len+1);
+  assert(tmp != NULL);
+  strncpy(tmp, string, entry->len);
+  tmp[entry->len] = '\0';
+  printf("ptr: %p\nlen: %u\nscr: %u\n[%s]\n", (void*)entry->global_ptr,
+         entry->len,
+         entry->score,
+         tmp);
+  free(tmp);
+  uint64_t* size = (uint64_t*)state;
+  *size += entry_size(entry->len);
+}
+
 /* Simple debugging function which outputs all of the contents of a dline.
  */
 void dline_debug(dline_t* dline) {
   dline_entry* current = (dline_entry*)dline;
+  uint64_t size = 0;
   printf("dline at 0x%llx\n", (uint64_t)current);
   
   if(dline == NULL) {
@@ -355,24 +391,8 @@ void dline_debug(dline_t* dline) {
     return;
   }
   
-  while(current->global_ptr != DLINE_MAGIC_TERMINATOR) {
-    /* bs required to add a null terminator, else we would have to scanf
-     * the printf string to add precision since the length isn't known in
-     * advance (even uglier).
-     */
-    char* tmp = (char*)malloc(current->len+1);
-    assert(tmp != NULL);
-    strncpy(tmp, (char*)current + sizeof(dline_entry), current->len);
-    tmp[current->len] = '\0';
-    printf("ptr: %p\nlen: %u\nscr: %u\n[%s]\n", (void*)current->global_ptr,
-                                                 current->len,
-                                                 current->score,
-                                                 tmp);
-    free(tmp);
-    current = next_entry(current);
-  }
-  printf("Total length: %llu\n", (uint64_t)current - (uint64_t)dline +
-         sizeof(void*));
+  dline_iterate(dline, &size, dline_debug_printer);
+  printf("Total length: %llu\n", size);
 }
 
 /* Print debug information about a results array

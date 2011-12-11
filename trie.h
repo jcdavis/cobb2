@@ -4,9 +4,13 @@
 #include "cobb2.h"
 #include "dline.h"
 
+/*Constant for now*/
+#define HASH_NODE_SIZE_LIMIT 10000
+
 typedef void trie_t;
 
 trie_t* trie_init();
+void trie_clean(trie_t* trie);
 
 op_result trie_upsert(trie_t* existing,
                       char* string,

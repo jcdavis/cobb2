@@ -27,6 +27,11 @@ typedef struct hash_node {
   dline_t* entries[NUM_BUCKETS];
 } hash_node;
 
+typedef struct split_state {
+  trie_t* new_node;
+  op_result result;
+} split_state;
+
 static inline uint64_t is_hash_node(trie_t* ptr) {
   return ((uint64_t)ptr)&1;
 }
@@ -36,6 +41,28 @@ static inline uint64_t is_hash_node(trie_t* ptr) {
  */
 static inline uint64_t hash_idx(char first) {
   return (uint64_t)first%NUM_BUCKETS;
+}
+
+static void split_dline_iter_fn(dline_entry* entry,
+                                char* string,
+                                void* state) {
+  split_state* spl_state = (split_state*)state;
+  
+  /* Iterator just loops over everything, so if there is a problem the rest
+   * of of the dline will still be looped over, and we won't want to do
+   * anything.
+   */
+  if(spl_state->result != NO_ERROR)
+    return;
+  
+  /*Since this is re-inserting from a split, it is always an insert*/
+  upsert_state u_state = {entry->global_ptr, 0, UPSERT_MODE_INSERT};
+  spl_state->result = trie_upsert(spl_state->new_node,
+                                  string,
+                                  0,
+                                  entry->len,
+                                  entry->score,
+                                  &u_state);
 }
 
 trie_t* trie_init() {
@@ -48,6 +75,25 @@ trie_t* trie_init() {
     node->children[i] = NULL;
   
   return (trie_t*)node;
+}
+
+/*recurisvely free up a trie*/
+void trie_clean(trie_t* trie) {
+  if(is_hash_node(trie)) {
+    hash_node* hash_ptr = (hash_node*)((uint64_t)trie-1);
+    for(int i = 0; i < NUM_BUCKETS; i++) {
+      if(hash_ptr->entries[i] != NULL)
+        free(hash_ptr->entries[i]);
+    }
+    free(hash_ptr);
+  } else {
+    trie_node* trie_ptr = (trie_node*)trie;
+    for(int i = 0; i < 256; i++) {
+      trie_clean(trie_ptr->children[i]);
+      free(trie_ptr->terminated);
+      free(trie);
+    }
+  }
 }
 
 /* Apply the upsert to this trie, returning the success/error
@@ -110,6 +156,60 @@ op_result trie_upsert(trie_t* existing,
       /*set parent trie node to point to our new hash node*/
       parent_ptr->children[(int)string[current_start-1]] =
         (trie_t*)((uint64_t)hash_ptr+1);
+    } else if(state->mode != UPSERT_MODE_UPDATE &&
+              hash_ptr->size >= HASH_NODE_SIZE_LIMIT) {
+      /* Time to split the current hash node into a trie node with any
+       * number of hash node children.
+       * NOTE: since we do this before a dline_upsert call, its possible
+       * that an update causes a split, because before the first suffix's
+       * upsert the state->mode will still be INITIAL at this point.
+       * TODO1: this is pretty inefficient, because we know in advance we
+       * will be doing large numbers of inserts, thus a dline in a single
+       * hash child will likely (but not necessarily, depending on
+       * distribution), get multiple inserts, so a continual doubling-style
+       * allocation is probably more appropriate than doing a perfect fit
+       * malloc on every dline_upsert call here.
+       * TODO2: we also probably will want to have the ability to limit the
+       * number of splits done in a whole insert to some fixed number, most
+       * likely 1, in order to avoid a slow worst case insert which happens
+       * to be unlucky enough to have to split multiple hash nodes.
+       */
+      trie_node* trie_ptr = (trie_node*)trie_init();
+      split_state spl_state = {trie_ptr, NO_ERROR};
+      
+      if(trie_ptr == NULL)
+        return MALLOC_FAIL;
+      
+      /* Loop over hash entries and re-insert into a new trie node */
+      for(int i = 0; i < NUM_BUCKETS && spl_state.result == NO_ERROR; i++) {
+        if(hash_ptr->entries[i] != NULL) {
+          dline_iterate(hash_ptr->entries[i], &spl_state,
+                        split_dline_iter_fn);
+        }
+      }
+      
+      if(spl_state.result != NO_ERROR) {
+        trie_clean(trie_ptr);
+        return spl_state.result;
+      }
+      
+      /*set parent trie node to point to our newly split trie node*/
+      parent_ptr->children[(int)string[current_start-1]] =
+        (trie_t*)trie_ptr;
+      
+      /*recursively free up the old hash node*/
+      trie_clean(current_ptr);
+      
+      /* Now do the actual upsert we came here to do, which may not still
+       * insert onto a hash node (could have terminated at the hash node,
+       * so it will now terminate at the newly split trie node)
+       */
+      return trie_upsert((trie_t*)trie_ptr,
+                         string,
+                         current_start,
+                         total_len,
+                         score,
+                         state);
     }
     
     /* If terminating, just hash to bucket 0. A terminating search
@@ -125,7 +225,6 @@ op_result trie_upsert(trie_t* existing,
       idx = hash_idx(string[current_start]);
     }
     
-    /*HUGE TODO: split*/
     dline_t* new_dline;
     op_result result = dline_upsert(hash_ptr->entries[idx],
                                     &new_dline,
@@ -137,7 +236,9 @@ op_result trie_upsert(trie_t* existing,
     if(result == NO_ERROR) {
       free(hash_ptr->entries[idx]);
       hash_ptr->entries[idx] = new_dline;
-      hash_ptr->size++;
+      
+      if(state->mode != UPSERT_MODE_UPDATE)
+        hash_ptr->size++;
     }
     return result;
   }
@@ -541,7 +642,7 @@ void trie_node_debug(trie_t* node) {
   }
   
   trie_node* t_node = (trie_node*)node;
-  printf("hash node at %p\n", node);
+  printf("trie node at %p\n", node);
   printf("terminated: %p\n", t_node->terminated);
   
   for(int i = 0; i < 256; i++) {
