@@ -23,21 +23,33 @@ void basic_test() {
   upsert_state state1 = {NULL, 0, 0};
   upsert_state state2 = {NULL, 0, 0};
   upsert_state state3 = {NULL, 0, 0};
-  short mode = UPSERT_MODE_INITIAL;
   dline_t* line1 = NULL;
   dline_t* line2 = NULL;
   
   assert(!dline_upsert(line1, &line2, string1, 2, strlen(string1),
                        9000, &state1));
-  mode = UPSERT_MODE_INITIAL;
   assert(!dline_upsert(line2, &line1, string2, 6, strlen(string2),
                        9002, &state2));
   free(line2);
-  mode = UPSERT_MODE_INITIAL;
   assert(!dline_upsert(line1, &line2, string3, 0, strlen(string3),
                        9001, &state3));
   free(line1);
   dline_debug(line2);
+  //move string2 down to the bottom
+  state2.mode = UPSERT_MODE_INITIAL;
+  state2.global_ptr = NULL;
+  assert(!dline_upsert(line2, &line1, string2, 6, strlen(string2),
+                       42, &state2));
+  free(line2);
+  dline_debug(line1);
+  //and now string1 up to the top
+  state1.mode = UPSERT_MODE_INITIAL;
+  state1.global_ptr = NULL;
+  assert(!dline_upsert(line1, &line2, string1, 2, strlen(string1),
+                       9005, &state1));
+  free(line1);
+  dline_debug(line2);
+  
   
   assert(!dline_remove(line2, &line1, string2, 6, strlen(string2)));
   free(line2);

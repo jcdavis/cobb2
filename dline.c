@@ -188,8 +188,8 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     uint64_t before_size, after_size = 0;
     
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
-          current->score > score &&
-          (uint64_t)current->global_ptr > (uint64_t)state->global_ptr) {
+          (current->score > score || (current->score == score &&
+          (uint64_t)current->global_ptr > (uint64_t)state->global_ptr))) {
       current = next_entry(current);
     }
     
@@ -247,8 +247,33 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
      */
     assert(state->global_ptr != NULL);
     
-    /*TODO: DO THIS, IT SUCKS*/
-    return NO_ERROR;
+    /* This works, but its slow due to a double-copy. TODO: make it faster*/
+    dline_t* tmp = NULL;
+    op_result update_result = dline_remove(existing,
+                                           &tmp,
+                                           string,
+                                           start,
+                                           total_len);
+    if(update_result == NO_ERROR) {
+      /* For just this call, we are doing an insert (since the old entry
+       * has been removed). Need to change back after the upsert call
+       */
+      state->mode = UPSERT_MODE_INSERT;
+      update_result = dline_upsert(tmp,
+                                   result,
+                                   string,
+                                   start,
+                                   total_len,
+                                   score,
+                                   state);
+      state->mode = UPSERT_MODE_UPDATE;
+      /* slightly sketchy failure handling here, should be cleaned up */
+      if(update_result != MALLOC_FAIL) {
+        free(tmp);
+      }
+    }
+    
+    return update_result;
   } else {
     return BAD_PARAM;
   }
@@ -262,7 +287,7 @@ op_result dline_remove(dline_t* existing,
                       char* string,
                       unsigned int start,
                       unsigned int total_len) {
-  if(existing == NULL || result == NULL)
+  if(existing == NULL || result == NULL || string == NULL)
     return BAD_PARAM;
   
   dline_entry* current = (dline_entry*)existing;
