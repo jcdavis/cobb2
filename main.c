@@ -14,9 +14,9 @@ void basic_test();
 void parser_test();
 
 int main(int argc, char** argv) {
-  //file_trie_query(argv[1]);
+  file_trie_query(argv[1]);
   //basic_test();
-  parser_test();
+  //parser_test();
 }
 
 void parser_test() {
@@ -103,22 +103,44 @@ void basic_test() {
 void file_trie_query(char* fname) {
   FILE* fp = fopen(fname, "r");
   char iline[500]; /*please say this is enough*/
-  
   trie_t* trie = trie_init();
-  
   int read = 0;
+  char* new;
+  
+  printf("start chars\n");
+  fgets(iline, 500, stdin);
+  unsigned char start_map[32];
+  iline[strlen(iline)-1] = '\0'; /*damn newline*/
+  bit_map_init(start_map, iline);
+  
+  printf("middle chars\n");
+  fgets(iline, 500, stdin);
+  unsigned char mid_map[32];
+  iline[strlen(iline)-1] = '\0'; /*damn newline*/
+  bit_map_init(mid_map, iline);
   
   while(fgets(iline, 500, fp)) {
-    upsert_state state = {NULL,0,0};
-    
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    assert(!trie_upsert(trie,
-                        iline,
-                        0,
-                        strlen(iline),
-                        (1000-strlen(iline)),
-                        &state));
+    assert(!normalize(iline, strlen(iline), &new));
+
+    int suffix_start = -1;
+    while((suffix_start = next_start(iline, strlen(iline),
+                                     start_map, mid_map,
+                                     suffix_start)) >= 0) {
+      upsert_state state = {NULL,0,0};
+      assert(!trie_upsert(trie,
+                          new,
+                          suffix_start,
+                          strlen(new),
+                          strlen(new),
+                          &state));
+    }
+    free(new);
     read++;
+    
+    if(read % 10000 == 0) {
+      printf("finished %d\n", read);
+    }
   }
   fclose(fp);
   

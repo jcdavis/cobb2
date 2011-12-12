@@ -25,6 +25,7 @@ op_result normalize(char* in, int len, char** out) {
   for(int i = 0; i < len; i++) {
     (*out)[i] = (char)tolower(in[i]);
   }
+  (*out)[len] = '\0';
   return NO_ERROR;
 }
 
