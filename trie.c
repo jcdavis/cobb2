@@ -55,7 +55,10 @@ static void split_dline_iter_fn(dline_entry* entry,
   if(spl_state->result != NO_ERROR)
     return;
   
-  /*Since this is re-inserting from a split, it is always an insert*/
+  /* Since this is re-inserting from a split, it is always an insert.
+   * Starting offset is 0 because this is the suffix string stored in the
+   * dline, not the full global string
+   */
   upsert_state u_state = {entry->global_ptr, 0, UPSERT_MODE_INSERT};
   spl_state->result = trie_upsert(spl_state->new_node,
                                   string,
@@ -89,8 +92,10 @@ void trie_clean(trie_t* trie) {
   } else {
     trie_node* trie_ptr = (trie_node*)trie;
     for(int i = 0; i < 256; i++) {
-      trie_clean(trie_ptr->children[i]);
-      free(trie_ptr->terminated);
+      if(trie_ptr->children[i] != NULL)
+        trie_clean(trie_ptr->children[i]);
+      if(trie_ptr->terminated != NULL)
+        free(trie_ptr->terminated);
       free(trie);
     }
   }
