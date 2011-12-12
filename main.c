@@ -2,17 +2,54 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <evhttp.h>
 #include "cobb2.h"
 #include "dline.h"
+#include "parse.h"
 #include "trie.h"
 
 void file_dline_query(char* fname);
 void file_trie_query(char* fname);
 void basic_test();
+void parser_test();
 
 int main(int argc, char** argv) {
-  file_trie_query(argv[1]);
+  //file_trie_query(argv[1]);
   //basic_test();
+  parser_test();
+}
+
+void parser_test() {
+  char iline[500];
+  while(fgets(iline, 500, stdin)) {
+    char* new;
+    iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    assert(!normalize(iline, strlen(iline), &new));
+    
+    /*We don't want to match on the normalized input*/
+    char* original = malloc(strlen(iline)+1);
+    strncpy(original, iline, strlen(iline)+1);
+    
+    printf("start chars\n");
+    fgets(iline, 500, stdin);
+    unsigned char start_map[32];
+    iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    bit_map_init(start_map, iline);
+    
+    printf("middle chars\n");
+    fgets(iline, 500, stdin);
+    unsigned char mid_map[32];
+    iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    bit_map_init(mid_map, iline);
+    
+    int suffix_start = -1;
+    while((suffix_start = next_start(original, strlen(new),
+                                     start_map, mid_map,
+                                     suffix_start)) >= 0) {
+      printf("%s\n", new+suffix_start);
+    }
+    free(new);
+  }
 }
 
 void basic_test() {
