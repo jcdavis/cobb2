@@ -187,9 +187,21 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     dline_entry* current = existing;
     uint64_t before_size, after_size = 0;
     
+    /* Sort order is
+     * 1. score
+     * 2. global_ptr within score (important for fast merging of multiple
+     * matching suffixes from the same string since this gives us deduping
+     * for very cheap)
+     * 3. length within global_ptr (thus when multiple suffixes from the
+     * same root string on this dline match, return just the longest one,
+     * which therefore starts earliest in the string)
+     */
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
           (current->score > score || (current->score == score &&
-          (uint64_t)current->global_ptr > (uint64_t)state->global_ptr))) {
+          (uint64_t)current->global_ptr > (uint64_t)state->global_ptr) ||
+          (current->score == score &&
+           (uint64_t)current->global_ptr == (uint64_t)state->global_ptr &&
+           current->len > suffix_len))) {
       current = next_entry(current);
     }
     
@@ -348,8 +360,11 @@ op_result dline_remove(dline_t* existing,
 }
 
 /* Search the given dline for suffixes starting with string[start] and
- * minimum score of min_score. Stores at most result_len number of entries in
- * results, and returns the number of results stored there.
+ * minimum score of min_score. Stores at most result_len number of entries
+ * in results, and returns the number of results stored there. Will NOT
+ * return more than a single entry per global_ptr. If there are multiple
+ * suffixes in this dline, it returns just the one with the longest length
+ * (starting earliest in the string).
  */
 int dline_search(dline_t* dline,
                  char* string,
@@ -364,10 +379,12 @@ int dline_search(dline_t* dline,
   dline_entry* current = (dline_entry*)dline;
   int num_found = 0;
   unsigned int match_len = start >= total_len ? 0 : total_len - start;
+  global_data* last_global_ptr = NULL;
   
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
         current->score >= min_score) {
-    if(match_len <= current->len &&
+    if(current->global_ptr != last_global_ptr &&
+       match_len <= current->len &&
        !memcmp(string+start, str_offset(current), match_len)) {
       results[num_found].global_ptr = current->global_ptr;
       results[num_found].score = current->score;
@@ -376,7 +393,7 @@ int dline_search(dline_t* dline,
       if(num_found == result_len)
         break;
     }
-    
+    last_global_ptr = current->global_ptr;
     current = next_entry(current);
   }
   

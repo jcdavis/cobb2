@@ -124,10 +124,10 @@ void file_trie_query(char* fname) {
     assert(!normalize(iline, strlen(iline), &new));
 
     int suffix_start = -1;
+    upsert_state state = {NULL,0,0};
     while((suffix_start = next_start(iline, strlen(iline),
                                      start_map, mid_map,
                                      suffix_start)) >= 0) {
-      upsert_state state = {NULL,0,0};
       assert(!trie_upsert(trie,
                           new,
                           suffix_start,
@@ -152,7 +152,7 @@ void file_trie_query(char* fname) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
     int num = trie_search(trie, iline, strlen(iline), results, 25);
     for(int i = 0; i < num; i++) {
-      printf("%d %s\n", results[i].score,
+      printf("%d %p %s\n", results[i].score, (void*)(results[i].global_ptr),
              GLOBAL_STR(results[i].global_ptr));
     }
   }
@@ -192,7 +192,7 @@ void file_dline_query(char* fname) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
     int num = dline_search(line1, iline, 0, strlen(iline), 0, results, 25);
     for(int i = 0; i < num; i++) {
-      printf("%d %s\n", results[i].score,
+      printf("%d %p %s\n", results[i].score, (void*)(results[i].global_ptr),
                         GLOBAL_STR(results[i].global_ptr));
     }
   }
