@@ -1,1 +1,1 @@
-stuff goes here
+A questionable, buggy implementation of a HAT-trie (paper crpit.com/confpapers/CRPITV62Askitis.pdf) for doing sorted prefix matching. Given specified matching start/middle characters for strings, allows prefix matching on found suffixes of those strings. Currently ASCII only
