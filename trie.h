@@ -5,7 +5,7 @@
 #include "dline.h"
 
 /*Constant for now*/
-#define HASH_NODE_SIZE_LIMIT 10000
+#define HASH_NODE_SIZE_LIMIT 15000
 
 typedef void trie_t;
 

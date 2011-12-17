@@ -3,6 +3,13 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <evhttp.h>
+#include <sys/time.h>
+
+#ifdef __MACH__
+#include <mach/clock.h>
+#include <mach/mach.h>
+#endif
+
 #include "cobb2.h"
 #include "dline.h"
 #include "parse.h"
@@ -12,6 +19,21 @@ void file_dline_query(char* fname);
 void file_trie_query(char* fname);
 void basic_test();
 void parser_test();
+
+/* stolen from https://gist.github.com/1087739 */
+static void get_time(struct timespec* ts) {
+  #ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
+  clock_serv_t cclock;
+  mach_timespec_t mts;
+  host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+  clock_get_time(cclock, &mts);
+  mach_port_deallocate(mach_task_self(), cclock);
+  ts->tv_sec = mts.tv_sec;
+  ts->tv_nsec = mts.tv_nsec;
+  #else
+  clock_gettime(CLOCK_REALTIME, ts);
+  #endif
+}
 
 int main(int argc, char** argv) {
   file_trie_query(argv[1]);
@@ -150,11 +172,21 @@ void file_trie_query(char* fname) {
   
   while(fgets(iline, 500, stdin)) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    struct timespec ts_before;
+    struct timespec ts_after;
+    get_time(&ts_before);
     int num = trie_search(trie, iline, strlen(iline), results, 25);
+    get_time(&ts_after);
     for(int i = 0; i < num; i++) {
       printf("%d %p %s\n", results[i].score, (void*)(results[i].global_ptr),
              GLOBAL_STR(results[i].global_ptr));
     }
+    double ms_time = 1000*(ts_after.tv_sec-ts_before.tv_sec);
+    /* In the event we hit a second boundary, this is negative, so subracts
+     * off the time added from a second above
+     */
+    ms_time += ((double)(ts_after.tv_nsec-ts_before.tv_nsec))/(1000000.0f);
+    printf("took %5.5g ms\n", ms_time);
   }
 }
 
