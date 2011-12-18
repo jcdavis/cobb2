@@ -187,6 +187,15 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     dline_entry* current = existing;
     uint64_t before_size, after_size = 0;
     
+    if(state->global_ptr == NULL) {
+      /*first suffix insert, so create the global_ptr*/
+      state->global_ptr = create_global(string, total_len);
+      
+      if(state->global_ptr == NULL) {
+        return MALLOC_FAIL;
+      }
+    }
+    
     /* Sort order is
      * 1. score
      * 2. global_ptr within score (important for fast merging of multiple
@@ -217,17 +226,8 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                                after_size + sizeof(void*));
     
     if(*result == NULL) {
+      free(state->global_ptr);
       return MALLOC_FAIL;
-    }
-    
-    if(state->global_ptr == NULL) {
-      /*first suffix insert, so create the global_ptr*/
-      state->global_ptr = create_global(string, total_len);
-      
-      if(state->global_ptr == NULL) {
-        free(*result);
-        return MALLOC_FAIL;
-      }
     }
     
     /*copy over entries before our new entry*/

@@ -441,7 +441,7 @@ static int hash_node_search(hash_node* node,
   dline_entry* built = spare;
   
   if(built_size == results_len) {
-    min_score = built[results_len].score;
+    min_score = built[results_len-1].score;
   }
   
   for(int i = 1; i < NUM_BUCKETS; i++) {
@@ -533,7 +533,7 @@ static int trie_fan_search(trie_t* trie,
     dline_entry* new_results = from;
     
     if(built_size == results_len) {
-      min_score = to[results_len].score;
+      min_score = to[results_len-1].score;
     }
     
     for(int i = 0; i < 256; i++) {
