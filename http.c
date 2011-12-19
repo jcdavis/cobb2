@@ -44,6 +44,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
                         NUM_RESULTS);
   for(int i = 0; i < len; i++) {
     int total = results[i].global_ptr->len;
+    /* this start calculation is broken */
     int start = total-results[i].len;
     evbuffer_add_printf(ret,
       "%s{\"str\":\"%s\",\"scr\":%d,\"st\":%d,\"len\":%d}",
