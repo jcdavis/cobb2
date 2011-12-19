@@ -12,6 +12,7 @@
 
 #include "cobb2.h"
 #include "dline.h"
+#include "http.h"
 #include "parse.h"
 #include "trie.h"
 
@@ -167,9 +168,8 @@ void file_trie_query(char* fname) {
   fclose(fp);
   
   printf("read %d lines. Query:\n", read);
-  
+#if 0
   dline_entry results[25];
-  
   while(fgets(iline, 500, stdin)) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
     struct timespec ts_before;
@@ -187,7 +187,11 @@ void file_trie_query(char* fname) {
      */
     ms_time += ((double)(ts_after.tv_nsec-ts_before.tv_nsec))/(1000000.0f);
     printf("took %5.5g ms\n", ms_time);
+    
   }
+#endif
+  init_and_run(trie, 5402);
+
 }
 
 void file_dline_query(char* fname) {
