@@ -1,3 +1,4 @@
 cobb2
 *.o
+*.swp
 hugedata/*
