@@ -17,6 +17,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   struct evkeyval* param;
   const char* uri = evhttp_request_get_uri(req);
   char* string = NULL;
+  char* callback = NULL;
 
   assert(ret != NULL);
   TAILQ_INIT(&params);
@@ -24,8 +25,10 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   evhttp_parse_query(uri, &params);
 
   TAILQ_FOREACH(param, &params, next) {
-    if(param->key != NULL && !strncmp(param->key, "q", 1))
+    if(param->key != NULL && !strcmp(param->key, "q"))
       string = param->value;
+    if(param->key != NULL && !strcmp(param->key, "callback"))
+      callback = param->value;
   }
   if(string == NULL) {
     evhttp_send_error(req, 400, "Bad Syntax");
@@ -39,22 +42,28 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
 
   evhttp_add_header(evhttp_request_get_output_headers(req),
                     "Content-Type", "application/json");
-  evbuffer_add_printf(ret, "{\"results\":[");
+  if(callback == NULL) {
+    evbuffer_add_printf(ret, "{\"results\":[");
+  } else {
+    evbuffer_add_printf(ret, "%s({\"results\":[", callback);
+  }
   int len = trie_search((trie_t*)arg, normalized, strlen(normalized), results,
                         NUM_RESULTS);
   for(int i = 0; i < len; i++) {
     int total = results[i].global_ptr->len;
     /* this start calculation is broken */
     int start = total-results[i].len;
+    char* encoded_string = evhttp_htmlescape(GLOBAL_STR(results[i].global_ptr));
     evbuffer_add_printf(ret,
       "%s{\"str\":\"%s\",\"scr\":%d,\"st\":%d,\"len\":%d}",
       i == 0 ? "" : ",",
-      GLOBAL_STR(results[i].global_ptr),
+      encoded_string,
       (int)results[i].score,
       (int)start,
       (int)strlen(normalized));
+    free(encoded_string);
   }
-  evbuffer_add_printf(ret, "]}\n");
+  evbuffer_add_printf(ret, "]}%s\n", callback != NULL ? ")" : "");
   evhttp_send_reply(req, HTTP_OK, "OK", ret);
   free(normalized);
   evbuffer_free(ret);

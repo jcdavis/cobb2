@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="jquery-ui-1.8.16.custom.css" rel="stylesheet" type="text/css"/>
+  <script src="jquery-1.6.2.js"></script>
+  <script src="jquery-ui-1.8.16.custom.js"></script>
+  <script>
+    $(document).ready(function() {
+      $("input#autocomplete").autocomplete({
+      source: function(req, cb) {
+	$.getJSON("http://localhost:5402/complete?q=" + escape(req.term) + "&callback=?",
+	  function(res) {
+	  var rStrings = new Array();
+          for(var i = 0; i < res.results.length; i++) {
+            rStrings[i] = res.results[i].str;
+          }
+          cb(rStrings);
+        });
+      },
+      delay: 0
+      });
+    });
+  </script>
+</head>
+<body style="font-size:62.5%;">
+<input id="autocomplete" />
+</body>
+</html>
+
+
