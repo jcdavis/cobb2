@@ -1,5 +1,9 @@
 #include <assert.h>
-#include <evhttp.h>
+#include <event2/buffer.h>
+#include <event2/event.h>
+#include <event2/http.h>
+#include <event2/keyvalq_struct.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
@@ -63,10 +67,20 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
       (int)strlen(normalized));
     free(encoded_string);
   }
+  
   evbuffer_add_printf(ret, "]}%s\n", callback != NULL ? ")" : "");
   evhttp_send_reply(req, HTTP_OK, "OK", ret);
+  
+  evhttp_clear_headers(&params);
   free(normalized);
   evbuffer_free(ret);
+}
+
+void quit_handler(struct evhttp_request* req, void* arg) {
+  printf("!!!!I was told to Quit!!!!\n");
+  evhttp_send_reply(req, HTTP_OK, "OK", NULL);
+  trie_clean((trie_t*)arg);
+  exit(0);
 }
 
 void init_and_run(trie_t* trie, int port) {
@@ -80,6 +94,7 @@ void init_and_run(trie_t* trie, int port) {
   assert(http != NULL);
 
   evhttp_set_cb(http, "/complete", prefix_handler, (void*)trie);
+  evhttp_set_cb(http, "/admin/quit", quit_handler, (void*)trie);
 
   assert(evhttp_bind_socket_with_handle(http, "0.0.0.0", port) != NULL);
   event_base_dispatch(base);

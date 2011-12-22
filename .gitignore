@@ -1,4 +1,5 @@
 cobb2
+cobb2.dSYM/*
 *.o
 *.swp
 hugedata/*

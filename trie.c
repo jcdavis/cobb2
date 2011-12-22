@@ -80,8 +80,11 @@ trie_t* trie_init() {
   return (trie_t*)node;
 }
 
-/*recurisvely free up a trie*/
+/* Recursively free up a trie. Big TODO: this doesn't clean out the
+ * relevant global pointers, hence is a leak
+ */
 void trie_clean(trie_t* trie) {
+  assert(trie != NULL);
   if(is_hash_node(trie)) {
     hash_node* hash_ptr = (hash_node*)((uint64_t)trie-1);
     for(int i = 0; i < NUM_BUCKETS; i++) {
@@ -94,10 +97,10 @@ void trie_clean(trie_t* trie) {
     for(int i = 0; i < 256; i++) {
       if(trie_ptr->children[i] != NULL)
         trie_clean(trie_ptr->children[i]);
-      if(trie_ptr->terminated != NULL)
-        free(trie_ptr->terminated);
-      free(trie);
     }
+    if(trie_ptr->terminated != NULL)
+      free(trie_ptr->terminated);
+    free(trie);
   }
 }
 
@@ -154,6 +157,7 @@ op_result trie_upsert(trie_t* existing,
       if(hash_ptr == NULL) 
         return MALLOC_FAIL;
       
+      hash_ptr->size = 0;
       for(int i = 0; i < NUM_BUCKETS; i++) {
         hash_ptr->entries[i] = NULL;
       }
@@ -249,7 +253,8 @@ op_result trie_upsert(trie_t* existing,
   }
 }
 
- /* Delete from this trie, returning success/error
+ /* Delete from this trie, returning success/error. TODO: this will leak
+  * a global pointer
   */
 op_result trie_remove(trie_t* existing,
                       char* string,

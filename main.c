@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <evhttp.h>
 #include <sys/time.h>
 
 #ifdef __MACH__
