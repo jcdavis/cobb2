@@ -29,4 +29,8 @@ typedef struct upsert_state {
   unsigned short mode;
 } upsert_state;
 
+typedef struct remove_state {
+  global_data* global_ptr;
+} remove_state;
+
 #endif

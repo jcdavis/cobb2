@@ -22,7 +22,8 @@ op_result trie_upsert(trie_t* existing,
 op_result trie_remove(trie_t* existing,
                       char* string,
                       unsigned int start,
-                      unsigned int total_len);
+                      unsigned int total_len,
+                      remove_state* state);
 
 int trie_search(trie_t* trie,
                 char* string,

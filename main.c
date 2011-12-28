@@ -93,6 +93,12 @@ void basic_test() {
   assert(!dline_upsert(line1, &line2, string3, 0, strlen(string3),
                        9001, &state3));
   free(line1);
+  //Insert a second suffix for string3 with just a single character
+  assert(!dline_upsert(line2, &line1, string3, 1, strlen(string3),
+                       9001, &state3));
+  free(line2);
+  line2 = line1;
+  
   dline_debug(line2);
   //move string2 down to the bottom
   state2.mode = UPSERT_MODE_INITIAL;
@@ -109,17 +115,31 @@ void basic_test() {
   free(line1);
   dline_debug(line2);
   
-  
-  assert(!dline_remove(line2, &line1, string2, 6, strlen(string2)));
+  remove_state rstate = {NULL};
+  assert(!dline_remove(line2, &line1, string2, 6, strlen(string2), &rstate));
+  assert(rstate.global_ptr == state2.global_ptr);
+  free(rstate.global_ptr);
   free(line2);
   dline_debug(line1);
-  assert(!dline_remove(line1, &line2, string1, 2, strlen(string1)));
+  
+  rstate.global_ptr = NULL;
+  assert(!dline_remove(line1, &line2, string1, 2, strlen(string1), &rstate));
+  assert(rstate.global_ptr == state1.global_ptr);
+  free(rstate.global_ptr);
   free(line1);
   dline_debug(line2);
-  assert(!dline_remove(line2, &line1, string3, 0, strlen(string3)));
+  
+  rstate.global_ptr = NULL;
+  assert(!dline_remove(line2, &line1, string3, 0, strlen(string3), &rstate));
+  assert(rstate.global_ptr == state3.global_ptr);
   free(line2);
   dline_debug(line1);
-  
+  //remove the second suffix of string3
+  assert(!dline_remove(line1, &line2, string3, 1, strlen(string3), &rstate));
+  assert(rstate.global_ptr == state3.global_ptr);
+  free(line1);
+  dline_debug(line2);
+  free(rstate.global_ptr);
 }
 
 void file_trie_query(char* fname) {

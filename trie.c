@@ -253,14 +253,15 @@ op_result trie_upsert(trie_t* existing,
   }
 }
 
- /* Delete from this trie, returning success/error. TODO: this will leak
-  * a global pointer
+ /* Delete from this trie, returning success/error. Caller must free the
+  * global_pointer in state after the last suffix removal
   */
 op_result trie_remove(trie_t* existing,
                       char* string,
                       unsigned int start,
-                      unsigned int total_len) {
-  if(existing == NULL || string == NULL)
+                      unsigned int total_len,
+                      remove_state* state) {
+  if(existing == NULL || string == NULL || state == NULL)
     return BAD_PARAM;
   
   int current_start = start;
@@ -284,7 +285,8 @@ op_result trie_remove(trie_t* existing,
                                     &new_dline,
                                     string,
                                     current_start,
-                                    total_len);
+                                    total_len,
+                                    state);
     if(result == NO_ERROR) {
       free(((trie_node*)current_ptr)->terminated);
       ((trie_node*)current_ptr)->terminated = new_dline;
@@ -309,7 +311,8 @@ op_result trie_remove(trie_t* existing,
                                     &new_dline,
                                     string,
                                     current_start,
-                                    total_len);
+                                    total_len,
+                                    state);
     if(result == NO_ERROR) {
       free(hash_ptr->entries[idx]);
       hash_ptr->entries[idx] = new_dline;

@@ -261,11 +261,13 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     
     /* This works, but its slow due to a double-copy. TODO: make it faster*/
     dline_t* tmp = NULL;
+    remove_state r_state = {state->global_ptr};
     op_result update_result = dline_remove(existing,
                                            &tmp,
                                            string,
                                            start,
-                                           total_len);
+                                           total_len,
+                                           &r_state);
     if(update_result == NO_ERROR) {
       /* For just this call, we are doing an insert (since the old entry
        * has been removed). Need to change back after the upsert call
@@ -298,23 +300,22 @@ op_result dline_remove(dline_t* existing,
                       dline_t** result,
                       char* string,
                       unsigned int start,
-                      unsigned int total_len) {
-  if(existing == NULL || result == NULL || string == NULL)
+                      unsigned int total_len,
+                      remove_state* state) {
+  if(existing == NULL || result == NULL || string == NULL || state == NULL)
     return BAD_PARAM;
   
   dline_entry* current = (dline_entry*)existing;
   uint64_t before_size, deleted_size, after_size = 0;
   unsigned int suffix_len = start >= total_len ? 0 : total_len - start;
   
-  /* Room for optimization here: after removing first suffix, we can save
-   * the global_ptr, and then shallow compare the pointers when we delete
-   * other suffixes.
-   */
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
+        ((state->global_ptr != NULL &&
+          state->global_ptr != current->global_ptr) ||
         (suffix_len != current->len ||
          memcmp(str_offset(current), string + start, suffix_len) ||
          current->global_ptr->len != total_len ||
-         memcmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
+         memcmp(GLOBAL_STR(current->global_ptr), string, total_len)))) {
     current = next_entry(current);
   }
   
@@ -324,6 +325,9 @@ op_result dline_remove(dline_t* existing,
   
   before_size = (uint64_t)current - (uint64_t)existing;
   deleted_size = entry_size(current->len);
+  
+  if(state->global_ptr == NULL)
+    state->global_ptr = current->global_ptr;
   
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR) {
     current = next_entry(current);
