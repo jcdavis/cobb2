@@ -145,7 +145,8 @@ void basic_test() {
 void file_trie_query(char* fname) {
   FILE* fp = fopen(fname, "r");
   char iline[500]; /*please say this is enough*/
-  trie_t* trie = trie_init();
+  //trie_t* trie = trie_init();
+  trie_t* trie = trie_presplit(32,127,2);
   int read = 0;
   char* new;
   

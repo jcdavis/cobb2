@@ -357,8 +357,9 @@ op_result dline_remove(dline_t* existing,
          ((char*)existing) + before_size + deleted_size,
          after_size);
   
-  /*termiante with magic (Ugh Ugly)*/
-  ((dline_entry*)((char*)*result + before_size + after_size))->global_ptr = DLINE_MAGIC_TERMINATOR;
+  /*terminate with magic (Ugh Ugly)*/
+  ((dline_entry*)((char*)*result + before_size + after_size))->global_ptr =
+    DLINE_MAGIC_TERMINATOR;
   
   return NO_ERROR;
 }

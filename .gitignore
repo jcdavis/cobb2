@@ -2,4 +2,5 @@ cobb2
 cobb2.dSYM/*
 *.o
 *.swp
+.DS_Store
 hugedata/*

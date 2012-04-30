@@ -80,8 +80,33 @@ trie_t* trie_init() {
   return (trie_t*)node;
 }
 
+/* Creates a trie with trie nodes pre-created in the low to high (inclusive)
+ * byte ranges with a given depth. This reduces time doing unnecessary
+ * splits in the case where a large amount of inserts are expected
+ */
+trie_t* trie_presplit(unsigned char low,
+                      unsigned char high,
+                      int depth) {
+  trie_t* node = trie_init();
+  if(node == NULL || depth <= 0)
+    return node;
+  for(unsigned char i = low; i <= high; i++) {
+    trie_t* result = trie_presplit(low, high, depth - 1);
+    if(result == NULL) {
+      trie_clean(node);
+      return NULL;
+    }
+    ((trie_node*)node)->children[i] = result;
+  }
+  return node;
+}
+
+
+
+
 /* Recursively free up a trie. Big TODO: this doesn't clean out the
- * relevant global pointers, hence is a leak
+ * relevant global pointers, hence is a leak if used for deleteing a whole
+ * trie.
  */
 void trie_clean(trie_t* trie) {
   assert(trie != NULL);

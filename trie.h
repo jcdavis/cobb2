@@ -10,6 +10,9 @@
 typedef void trie_t;
 
 trie_t* trie_init();
+trie_t* trie_presplit(unsigned char low,
+                      unsigned char high,
+                      int depth);
 void trie_clean(trie_t* trie);
 
 op_result trie_upsert(trie_t* existing,
