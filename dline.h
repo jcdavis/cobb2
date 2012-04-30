@@ -37,7 +37,7 @@ int dline_search(dline_t* dline,
                  unsigned int start,
                  unsigned int total_len,
                  int min_score,
-                 dline_entry* results,
+                 result_entry* results,
                  int result_len);
 
 void dline_debug(dline_t* dline);

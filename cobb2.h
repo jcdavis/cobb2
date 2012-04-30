@@ -33,4 +33,11 @@ typedef struct remove_state {
   global_data* global_ptr;
 } remove_state;
 
+/* Results need an additional offset to calculate start position*/
+typedef struct result_entry {
+  global_data* global_ptr;
+  unsigned int score;
+  unsigned int len;
+  unsigned int offset;
+} result_entry;
 #endif

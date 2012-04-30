@@ -350,19 +350,20 @@ op_result trie_remove(trie_t* existing,
 /* TODO: can do a cute hack by unioning over score+len into a uint64_t/etc
  * and then doing a single movq instead of 2 movl :)
  */
-static inline void copy_entry(dline_entry* dest, dline_entry* src) {
+static inline void copy_entry(result_entry* dest, result_entry* src) {
   dest->global_ptr = src->global_ptr;
   dest->score = src->score;
   dest->len = src->len;
+  dest->offset = src->offset;
 }
 
 /* Merge 2 sorted dline result lists, returning the number stored in dest.
  */
-static int merge(dline_entry* s1,
+static int merge(result_entry* s1,
                  int s1_num,
-                 dline_entry* s2,
+                 result_entry* s2,
                  int s2_num,
-                 dline_entry* dest,
+                 result_entry* dest,
                  int dest_len) {
   assert(s1 != NULL && s2 != NULL && dest != NULL);
   
@@ -405,13 +406,13 @@ static int merge(dline_entry* s1,
     if(s1_idx < s1_num) {
       uint64_t smaller = MIN(dest_len-dest_idx,s1_num-s1_idx);
       memcpy(&dest[dest_idx], &s1[s1_idx],
-             smaller*sizeof(dline_entry));
+             smaller*sizeof(result_entry));
       dest_idx += smaller;
     } else {
       assert(s2_idx < s2_num || s2_num == 0);
       uint64_t smaller = MIN(dest_len-dest_idx,s2_num-s2_idx);
       memcpy(&dest[dest_idx], &s2[s2_idx],
-             smaller*sizeof(dline_entry));
+             smaller*sizeof(result_entry));
       dest_idx += smaller;
     }
   }
@@ -427,9 +428,9 @@ static int hash_node_search(hash_node* node,
                             unsigned int start,
                             unsigned int total_len,
                             int min_score,
-                            dline_entry* from,
-                            dline_entry* to,
-                            dline_entry* spare,
+                            result_entry* from,
+                            result_entry* to,
+                            result_entry* spare,
                             int from_size,
                             int results_len) {
   assert(node != NULL && string != NULL && from != NULL && to != NULL
@@ -471,7 +472,7 @@ static int hash_node_search(hash_node* node,
   /* We alternate which buffer dline_search holds the results so far,
    * and then merge with the results from dline_search into the other buffer
    */
-  dline_entry* built = spare;
+  result_entry* built = spare;
   
   if(built_size == results_len) {
     min_score = built[results_len-1].score;
@@ -512,7 +513,7 @@ static int hash_node_search(hash_node* node,
    * giving a 50% chance we don't have to do this copy. Or alternatively,
    * just rewriting which pointer has the results (or something of the sort)
    */
-  memcpy(to, built, built_size*sizeof(dline_entry));
+  memcpy(to, built, built_size*sizeof(result_entry));
   return built_size;
 }
 
@@ -528,9 +529,9 @@ static int trie_fan_search(trie_t* trie,
                            unsigned int start,
                            unsigned int total_len,
                            int min_score,
-                           dline_entry* from,
-                           dline_entry* to,
-                           dline_entry* spare,
+                           result_entry* from,
+                           result_entry* to,
+                           result_entry* spare,
                            int from_size,
                            int results_len) {
   assert(trie != NULL && string != NULL && from != NULL && to != NULL
@@ -562,8 +563,8 @@ static int trie_fan_search(trie_t* trie,
                        from, from_size,
                        to, results_len);
     
-    dline_entry* old_results = to;
-    dline_entry* new_results = from;
+    result_entry* old_results = to;
+    result_entry* new_results = from;
     
     if(built_size == results_len) {
       min_score = to[results_len-1].score;
@@ -598,7 +599,7 @@ static int trie_fan_search(trie_t* trie,
     }
     
     if(new_results == from)
-      memcpy(to, from, built_size*sizeof(dline_entry));
+      memcpy(to, from, built_size*sizeof(result_entry));
     return built_size;
   }
 }
@@ -609,7 +610,7 @@ static int trie_fan_search(trie_t* trie,
 int trie_search(trie_t* trie,
                 char* string,
                 unsigned int total_len,
-                dline_entry* results,
+                result_entry* results,
                 int results_len) {
   if(trie == NULL || string == NULL || results == NULL)
     return 0;
@@ -628,13 +629,13 @@ int trie_search(trie_t* trie,
     return 0;
   }
   
-  dline_entry* spare1 = (dline_entry*)calloc(results_len,
-                                             sizeof(dline_entry));
+  result_entry* spare1 = (result_entry*)calloc(results_len,
+                                               sizeof(result_entry));
   if(spare1 == NULL) {
     return 0;
   }
-  dline_entry* spare2 = (dline_entry*)calloc(results_len,
-                                             sizeof(dline_entry));
+  result_entry* spare2 = (result_entry*)calloc(results_len,
+                                             sizeof(result_entry));
   if(spare2 == NULL) {
     free(spare1);
     return 0;

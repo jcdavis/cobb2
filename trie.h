@@ -31,6 +31,6 @@ op_result trie_remove(trie_t* existing,
 int trie_search(trie_t* trie,
                 char* string,
                 unsigned int total_len,
-                dline_entry* results,
+                result_entry* results,
                 int results_len);
 #endif

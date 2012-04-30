@@ -242,7 +242,7 @@ void file_dline_query(char* fname) {
   
   printf("read %d lines. Query:\n", read);
   
-  dline_entry results[25];
+  result_entry results[25];
   
   while(fgets(iline, 500, stdin)) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/

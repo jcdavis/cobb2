@@ -20,7 +20,8 @@
  * The termination of a dline is represented as the start of a dline_entry
  * with a magic global_ptr
  *
- * Suffixes are stored in score sorted order, and within score by global_ptr.'
+ * Suffixes are stored in score sorted order, within score by global_ptr, and
+ * withing global_ptr by length.
  * In actual usage, dlines are immutable: all operations create the a copy of 
  * the a dline with the given update applied to them.
  */
@@ -376,7 +377,7 @@ int dline_search(dline_t* dline,
                  unsigned int start,
                  unsigned int total_len,
                  int min_score,
-                 dline_entry* results,
+                 result_entry* results,
                  int result_len) {
   if(dline == NULL || string == NULL || results == NULL)
     return 0;
@@ -394,6 +395,7 @@ int dline_search(dline_t* dline,
       results[num_found].global_ptr = current->global_ptr;
       results[num_found].score = current->score;
       results[num_found].len = current->len;
+      results[num_found].offset = start;
       num_found++;
       if(num_found == result_len)
         break;
@@ -444,11 +446,14 @@ void dline_debug(dline_t* dline) {
 
 /* Print debug information about a results array
  */
-void dline_entry_debug(dline_entry* data, int size) {
+void result_entry_debug(result_entry* data, int size) {
   printf("for %d entries at %p\n", size, (void*)data);
   
   for(int i = 0; i < size; i++) {
-    printf("Global %p score %d len %d\n", (void*)data[i].global_ptr,
-           data[i].score, data[i].len);
+    printf("Global %p score %d len %d offset %d\n",
+           (void*)data[i].global_ptr,
+           data[i].score,
+           data[i].len,
+           data[i].offset);
   }
 }
