@@ -42,4 +42,8 @@ int dline_search(dline_t* dline,
 
 void dline_debug(dline_t* dline);
 
+uint64_t dline_size(dline_t* dline);
+
+void result_entry_debug(result_entry* data, int size);
+
 #endif

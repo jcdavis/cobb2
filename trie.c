@@ -700,3 +700,34 @@ void trie_debug(trie_t* trie) {
     trie_node_debug(trie);
   }
 }
+
+/* Calculate how how much real memory is used by a given trie
+ */
+uint64_t trie_memory_usage(trie_t* trie) {
+  uint64_t count = 0;
+  
+  if(is_hash_node(trie)) {
+    count += sizeof(hash_node);
+    hash_node* h_node = (hash_node*)((uint64_t)trie-1);
+    
+    for(int i = 0; i < NUM_BUCKETS; i++) {
+      if(h_node->entries[i] != NULL) {
+        count += dline_size(h_node->entries[i]);
+      }
+    }
+  } else {
+    count += sizeof(trie_node);
+    trie_node* t_node = (trie_node*)trie;
+    if(t_node->terminated != NULL) {
+      count += dline_size(t_node->terminated);
+    }
+    
+    for(int i = 0; i < 256; i++) {
+      if(t_node->children[i] != NULL) {
+        count += trie_memory_usage((trie_t*)(t_node->children[i]));
+      }
+    }
+  }
+  
+  return count;
+}

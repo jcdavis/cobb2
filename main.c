@@ -187,7 +187,9 @@ void file_trie_query(char* fname) {
   }
   fclose(fp);
   
-  printf("read %d lines. Query:\n", read);
+  uint64_t size = trie_memory_usage(trie);
+  
+  printf("read %d lines into %llu bytes Query:\n", read, size);
 #if 0
   dline_entry results[25];
   while(fgets(iline, 500, stdin)) {

@@ -33,4 +33,7 @@ int trie_search(trie_t* trie,
                 unsigned int total_len,
                 result_entry* results,
                 int results_len);
+
+uint64_t trie_memory_usage(trie_t* trie);
+
 #endif

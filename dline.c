@@ -407,6 +407,11 @@ int dline_search(dline_t* dline,
   return num_found;
 }
 
+typedef struct dline_debug_state {
+  uint64_t size;
+  int print_contents;
+} dline_debug_state;
+
 /*Iterator function which prints out contents of a single entry in a dline*/
 static void dline_debug_printer(dline_entry* entry,
                                 char* string,
@@ -415,24 +420,26 @@ static void dline_debug_printer(dline_entry* entry,
    * the printf string to add precision since the length isn't known in
    * advance (even uglier).
    */
-  char* tmp = (char*)malloc(entry->len+1);
-  assert(tmp != NULL);
-  strncpy(tmp, string, entry->len);
-  tmp[entry->len] = '\0';
-  printf("ptr: %p\nlen: %u\nscr: %u\n[%s]\n", (void*)entry->global_ptr,
-         entry->len,
-         entry->score,
-         tmp);
-  free(tmp);
-  uint64_t* size = (uint64_t*)state;
-  *size += entry_size(entry->len);
+  dline_debug_state* debug_state = (dline_debug_state*)state;
+  if(debug_state->print_contents) {
+    char* tmp = (char*)malloc(entry->len+1);
+    assert(tmp != NULL);
+    strncpy(tmp, string, entry->len);
+    tmp[entry->len] = '\0';
+    printf("ptr: %p\nlen: %u\nscr: %u\n[%s]\n", (void*)entry->global_ptr,
+           entry->len,
+           entry->score,
+           tmp);
+    free(tmp);
+  }
+  debug_state->size += entry_size(entry->len);
 }
 
 /* Simple debugging function which outputs all of the contents of a dline.
  */
 void dline_debug(dline_t* dline) {
   dline_entry* current = (dline_entry*)dline;
-  uint64_t size = 0;
+  dline_debug_state state = {0L,1};
   printf("dline at 0x%llx\n", (uint64_t)current);
   
   if(dline == NULL) {
@@ -440,9 +447,23 @@ void dline_debug(dline_t* dline) {
     return;
   }
   
-  dline_iterate(dline, &size, dline_debug_printer);
-  printf("Total length: %llu\n", size);
+  dline_iterate(dline, &state, dline_debug_printer);
+  printf("Total length: %llu\n", (state.size + 8));
 }
+
+/* return actual size of a dline in bytes
+ */
+uint64_t dline_size(dline_t* dline) {
+  dline_entry* current = (dline_entry*)dline;
+  dline_debug_state state = {0L,0};
+  if(dline == NULL) {
+    return 0;
+  }
+  
+  dline_iterate(dline, &state, dline_debug_printer);
+  return state.size + 8;
+}
+
 
 /* Print debug information about a results array
  */
