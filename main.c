@@ -79,23 +79,22 @@ void basic_test() {
   static char* string2 = "Foo Bar Baz";
   static char* string3 = "42";
   
+  string_data stringdata1 = {string1, string1, strlen(string1)};
+  string_data stringdata2 = {string2, string2, strlen(string2)};
+  string_data stringdata3 = {string3, string3, strlen(string3)};
   upsert_state state1 = {NULL, 0, 0};
   upsert_state state2 = {NULL, 0, 0};
   upsert_state state3 = {NULL, 0, 0};
   dline_t* line1 = NULL;
   dline_t* line2 = NULL;
   
-  assert(!dline_upsert(line1, &line2, string1, 2, strlen(string1),
-                       9000, &state1));
-  assert(!dline_upsert(line2, &line1, string2, 6, strlen(string2),
-                       9002, &state2));
+  assert(!dline_upsert(line1, &line2, &stringdata1, 2, 9000, &state1));
+  assert(!dline_upsert(line2, &line1, &stringdata2, 6, 9002, &state2));
   free(line2);
-  assert(!dline_upsert(line1, &line2, string3, 0, strlen(string3),
-                       9001, &state3));
+  assert(!dline_upsert(line1, &line2, &stringdata3, 0, 9001, &state3));
   free(line1);
   //Insert a second suffix for string3 with just a single character
-  assert(!dline_upsert(line2, &line1, string3, 1, strlen(string3),
-                       9001, &state3));
+  assert(!dline_upsert(line2, &line1, &stringdata3, 1, 9001, &state3));
   free(line2);
   line2 = line1;
   
@@ -103,39 +102,37 @@ void basic_test() {
   //move string2 down to the bottom
   state2.mode = UPSERT_MODE_INITIAL;
   state2.global_ptr = NULL;
-  assert(!dline_upsert(line2, &line1, string2, 6, strlen(string2),
-                       42, &state2));
+  assert(!dline_upsert(line2, &line1, &stringdata2, 6, 42, &state2));
   free(line2);
   dline_debug(line1);
   //and now string1 up to the top
   state1.mode = UPSERT_MODE_INITIAL;
   state1.global_ptr = NULL;
-  assert(!dline_upsert(line1, &line2, string1, 2, strlen(string1),
-                       9005, &state1));
+  assert(!dline_upsert(line1, &line2, &stringdata1, 2, 9005, &state1));
   free(line1);
   dline_debug(line2);
   
   remove_state rstate = {NULL};
-  assert(!dline_remove(line2, &line1, string2, 6, strlen(string2), &rstate));
+  assert(!dline_remove(line2, &line1, &stringdata2, 6, &rstate));
   assert(rstate.global_ptr == state2.global_ptr);
   free(rstate.global_ptr);
   free(line2);
   dline_debug(line1);
   
   rstate.global_ptr = NULL;
-  assert(!dline_remove(line1, &line2, string1, 2, strlen(string1), &rstate));
+  assert(!dline_remove(line1, &line2, &stringdata1, 2, &rstate));
   assert(rstate.global_ptr == state1.global_ptr);
   free(rstate.global_ptr);
   free(line1);
   dline_debug(line2);
   
   rstate.global_ptr = NULL;
-  assert(!dline_remove(line2, &line1, string3, 0, strlen(string3), &rstate));
+  assert(!dline_remove(line2, &line1, &stringdata3, 0, &rstate));
   assert(rstate.global_ptr == state3.global_ptr);
   free(line2);
   dline_debug(line1);
   //remove the second suffix of string3
-  assert(!dline_remove(line1, &line2, string3, 1, strlen(string3), &rstate));
+  assert(!dline_remove(line1, &line2, &stringdata3, 1, &rstate));
   assert(rstate.global_ptr == state3.global_ptr);
   free(line1);
   dline_debug(line2);
@@ -148,7 +145,6 @@ void file_trie_query(char* fname) {
   //trie_t* trie = trie_init();
   trie_t* trie = trie_presplit(32,127,2);
   int read = 0;
-  char* new;
   
   printf("start chars\n");
   fgets(iline, 500, stdin);
@@ -164,7 +160,8 @@ void file_trie_query(char* fname) {
   
   while(fgets(iline, 500, fp)) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    assert(!normalize(iline, strlen(iline), &new));
+    string_data string = {iline, NULL, strlen(iline)};
+    assert(!normalize(iline, string.length, &(string.normalized)));
 
     int suffix_start = -1;
     upsert_state state = {NULL,0,0};
@@ -172,13 +169,12 @@ void file_trie_query(char* fname) {
                                      start_map, mid_map,
                                      suffix_start)) >= 0) {
       assert(!trie_upsert(trie,
-                          new,
+                          &string,
                           suffix_start,
-                          strlen(new),
-                          strlen(new),
+                          string.length,
                           &state));
     }
-    free(new);
+    free(string.normalized);
     read++;
     
     if(read % 10000 == 0) {
@@ -229,11 +225,11 @@ void file_dline_query(char* fname) {
     upsert_state state = {NULL,0,0};
     
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
+    string_data stringdata = {iline, iline, strlen(iline)};
     assert(!dline_upsert(line1,
                          &line2,
-                         iline,
+                         &stringdata,
                          0,
-                         strlen(iline),
                          (100000-strlen(iline)),
                          &state));
     free(line1);
@@ -248,7 +244,8 @@ void file_dline_query(char* fname) {
   
   while(fgets(iline, 500, stdin)) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    int num = dline_search(line1, iline, 0, strlen(iline), 0, results, 25);
+    string_data stringdata = {iline, iline, strlen(iline)};
+    int num = dline_search(line1, &stringdata, 0, 0, results, 25);
     for(int i = 0; i < num; i++) {
       printf("%d %p %s\n", results[i].score, (void*)(results[i].global_ptr),
                         GLOBAL_STR(results[i].global_ptr));

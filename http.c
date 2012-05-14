@@ -20,7 +20,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   struct evkeyvalq params;
   struct evkeyval* param;
   const char* uri = evhttp_request_get_uri(req);
-  char* string = NULL;
+  char* full_string = NULL;
   char* callback = NULL;
 
   assert(ret != NULL);
@@ -30,19 +30,19 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
 
   TAILQ_FOREACH(param, &params, next) {
     if(param->key != NULL && !strcmp(param->key, "q"))
-      string = param->value;
+      full_string = param->value;
     if(param->key != NULL && !strcmp(param->key, "callback"))
       callback = param->value;
   }
-  if(string == NULL) {
+  if(full_string == NULL) {
     evhttp_send_error(req, 400, "Bad Syntax");
     evbuffer_free(ret);
     return;
   }
 
-  char* normalized;
   /* This strlen is almost certainly a security bug */
-  assert(!normalize(string, strlen(string), &normalized));
+  string_data string = {full_string, NULL, strlen(full_string)};
+  assert(!normalize(full_string, string.length, &(string.normalized)));
 
   evhttp_add_header(evhttp_request_get_output_headers(req),
                     "Content-Type", "application/json");
@@ -51,7 +51,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   } else {
     evbuffer_add_printf(ret, "%s({\"results\":[", callback);
   }
-  int len = trie_search((trie_t*)arg, normalized, strlen(normalized), results,
+  int len = trie_search((trie_t*)arg, &string, results,
                         NUM_RESULTS);
   for(int i = 0; i < len; i++) {
     int total = results[i].global_ptr->len;
@@ -63,7 +63,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
       encoded_string,
       (int)results[i].score,
       (int)start,
-      (int)strlen(normalized));
+      (int)(string.length));
     free(encoded_string);
   }
   
@@ -71,7 +71,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   evhttp_send_reply(req, HTTP_OK, "OK", ret);
   
   evhttp_clear_headers(&params);
-  free(normalized);
+  free(string.normalized);
   evbuffer_free(ret);
 }
 

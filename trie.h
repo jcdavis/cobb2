@@ -16,21 +16,18 @@ trie_t* trie_presplit(unsigned char low,
 void trie_clean(trie_t* trie);
 
 op_result trie_upsert(trie_t* existing,
-                      char* string,
+                      string_data* string,
                       unsigned int start,
-                      unsigned int total_len,
                       int score,
                       upsert_state* state);
 
 op_result trie_remove(trie_t* existing,
-                      char* string,
+                      string_data* string,
                       unsigned int start,
-                      unsigned int total_len,
                       remove_state* state);
 
 int trie_search(trie_t* trie,
-                char* string,
-                unsigned int total_len,
+                string_data* string,
                 result_entry* results,
                 int results_len);
 

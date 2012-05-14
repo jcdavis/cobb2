@@ -2,7 +2,7 @@ TODOS
 =====
 Core functionality
 ------------------
-Store full un-normalized strings in global headers and return those instead
+Non-ASCII
 Http server
 -----------
 Support put/delete APIs

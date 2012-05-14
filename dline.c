@@ -56,12 +56,12 @@ static inline char* str_offset(dline_entry* entry) {
   return ((char*)entry) + sizeof(dline_entry);
 }
 
-static global_data* create_global(char* string, int total_len) {
-  global_data* result = malloc(sizeof(global_data) + total_len + 1);
+static global_data* create_global(string_data* string) {
+  global_data* result = malloc(sizeof(global_data) + string->length + 1);
   if(result == NULL)
     return NULL;
-  result->len = total_len;
-  memcpy(GLOBAL_STR(result), string, total_len + 1);
+  result->len = string->length;
+  memcpy(GLOBAL_STR(result), string->full, string->length + 1);
   
   return result;
 }
@@ -86,16 +86,15 @@ void dline_iterate(dline_t* dline, void* state, dline_iter_fn function) {
  */
 op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                        dline_t** result, /* resulting dline*/
-                       char* string,/*full string to upsert*/
+                       string_data* string,/* string information */
                        unsigned int start,/*offset from start of string*/
-                       unsigned int total_len,/*NOT including an ending \0*/
                        int score, /*score to set*/
                        upsert_state* state) {/*set on first call*/
   if(string == NULL || result == NULL || state == NULL)
     return BAD_PARAM;
   
-  unsigned int suffix_len = start >= total_len ? 0 : total_len - start;
-  
+  unsigned int suffix_len =
+    start >= string->length ? 0 : string->length - start;
   
   if(existing == NULL) {
     /*if the dline is NULL, we can't possibily be doing an update*/
@@ -113,7 +112,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     if(state->global_ptr == NULL) {
       assert(state->mode == UPSERT_MODE_INITIAL);
       /*first suffix insert, so create the global_ptr*/
-      state->global_ptr = create_global(string, total_len);
+      state->global_ptr = create_global(string);
       
       if(state->global_ptr == NULL) {
         free(*result);
@@ -127,7 +126,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     new_entry->global_ptr = state->global_ptr;
     new_entry->score = score;
     new_entry->len = suffix_len;
-    memcpy(str_offset(new_entry), string+start, suffix_len);
+    memcpy(str_offset(new_entry), string->normalized + start, suffix_len);
     /*trailing magic pointer to indicate end of a dline.*/
     next_entry(new_entry)->global_ptr = DLINE_MAGIC_TERMINATOR;
     
@@ -153,9 +152,11 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
      */
     while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
           (suffix_len != current->len ||
-           memcmp(str_offset(current), string + start, suffix_len) ||
-           current->global_ptr->len != total_len ||
-           memcmp(GLOBAL_STR(current->global_ptr), string, total_len))) {
+           memcmp(str_offset(current), string->normalized + start,
+                  suffix_len) ||
+           current->global_ptr->len != string->length ||
+           memcmp(GLOBAL_STR(current->global_ptr), string->full,
+                  string->length))){
       current = next_entry(current);        
     }
     
@@ -164,8 +165,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
        * efficient way of doing things, but it'll work for now
        */
       state->mode = UPSERT_MODE_INSERT;
-      return dline_upsert(existing, result, string, start, total_len,
-                          score, state);
+      return dline_upsert(existing, result, string, start, score, state);
     } else {
       /* ran into a identical suffix with a full string identical to ours,
        * so this is an update. Similar to above, this just recurses for now.
@@ -173,8 +173,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
       state->mode = UPSERT_MODE_UPDATE;
       state->global_ptr = current->global_ptr;
       state->old_score = current->score;
-      return dline_upsert(existing, result, string, start, total_len, 
-                          score, state);
+      return dline_upsert(existing, result, string, start, score, state);
     }
     
     return NO_ERROR;
@@ -190,7 +189,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     
     if(state->global_ptr == NULL) {
       /*first suffix insert, so create the global_ptr*/
-      state->global_ptr = create_global(string, total_len);
+      state->global_ptr = create_global(string);
       
       if(state->global_ptr == NULL) {
         return MALLOC_FAIL;
@@ -241,7 +240,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     new_entry->global_ptr = state->global_ptr;
     new_entry->score = score;
     new_entry->len = suffix_len;
-    memcpy(str_offset(new_entry), string + start, suffix_len);
+    memcpy(str_offset(new_entry), string->normalized + start, suffix_len);
     
     /*copy over entries after our new entry*/
     memcpy(((char*)*result) + before_size + entry_size(suffix_len),
@@ -267,7 +266,6 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                                            &tmp,
                                            string,
                                            start,
-                                           total_len,
                                            &r_state);
     if(update_result == NO_ERROR) {
       /* For just this call, we are doing an insert (since the old entry
@@ -278,7 +276,6 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                                    result,
                                    string,
                                    start,
-                                   total_len,
                                    score,
                                    state);
       state->mode = UPSERT_MODE_UPDATE;
@@ -299,24 +296,27 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
  */
 op_result dline_remove(dline_t* existing,
                       dline_t** result,
-                      char* string,
+                      string_data* string,
                       unsigned int start,
-                      unsigned int total_len,
                       remove_state* state) {
   if(existing == NULL || result == NULL || string == NULL || state == NULL)
     return BAD_PARAM;
   
   dline_entry* current = (dline_entry*)existing;
   uint64_t before_size, deleted_size, after_size = 0;
-  unsigned int suffix_len = start >= total_len ? 0 : total_len - start;
+  unsigned int suffix_len =
+    start >= string->length ? 0 : string->length - start;
+
   
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
         ((state->global_ptr != NULL &&
           state->global_ptr != current->global_ptr) ||
         (suffix_len != current->len ||
-         memcmp(str_offset(current), string + start, suffix_len) ||
-         current->global_ptr->len != total_len ||
-         memcmp(GLOBAL_STR(current->global_ptr), string, total_len)))) {
+         memcmp(str_offset(current), string->normalized + start,
+                suffix_len) ||
+         current->global_ptr->len != string->length ||
+         memcmp(GLOBAL_STR(current->global_ptr), string->full,
+                string->length)))) {
     current = next_entry(current);
   }
   
@@ -373,9 +373,8 @@ op_result dline_remove(dline_t* existing,
  * (starting earliest in the string).
  */
 int dline_search(dline_t* dline,
-                 char* string,
+                 string_data* string,
                  unsigned int start,
-                 unsigned int total_len,
                  int min_score,
                  result_entry* results,
                  int result_len) {
@@ -384,14 +383,15 @@ int dline_search(dline_t* dline,
   
   dline_entry* current = (dline_entry*)dline;
   int num_found = 0;
-  unsigned int match_len = start >= total_len ? 0 : total_len - start;
+  unsigned int match_len =
+    start >= string->length ? 0 : string->length - start;
   global_data* last_global_ptr = NULL;
   
   while(current->global_ptr != DLINE_MAGIC_TERMINATOR &&
         current->score >= min_score) {
     if(current->global_ptr != last_global_ptr &&
        match_len <= current->len &&
-       !memcmp(string+start, str_offset(current), match_len)) {
+       !memcmp(string->normalized + start, str_offset(current), match_len)) {
       results[num_found].global_ptr = current->global_ptr;
       results[num_found].score = current->score;
       results[num_found].len = current->len;
@@ -454,7 +454,6 @@ void dline_debug(dline_t* dline) {
 /* return actual size of a dline in bytes
  */
 uint64_t dline_size(dline_t* dline) {
-  dline_entry* current = (dline_entry*)dline;
   dline_debug_state state = {0L,0};
   if(dline == NULL) {
     return 0;

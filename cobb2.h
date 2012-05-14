@@ -1,12 +1,19 @@
 #ifndef _COBB2_H_
 #define _COBB2_H_
 
+/* String contents are stored immediately after the end of this struct*/
 typedef struct global_data {
-  void* unused;
   int len;
 } global_data;
 
 #define GLOBAL_STR(g) ((char*)g + sizeof(global_data))
+
+/* For now, the full string must have the same byte length when normalized*/
+typedef struct string_data {
+  char* full; /*full string to upsert*/
+  char* normalized; /*normalized string to be indexed*/
+  unsigned int length; /*NOT including a trailing \0*/
+} string_data;
 
 enum op_ret {
   NO_ERROR = 0,
@@ -40,4 +47,5 @@ typedef struct result_entry {
   unsigned int len;
   unsigned int offset;
 } result_entry;
+
 #endif

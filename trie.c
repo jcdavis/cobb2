@@ -44,7 +44,7 @@ static inline uint64_t hash_idx(char first) {
 }
 
 static void split_dline_iter_fn(dline_entry* entry,
-                                char* string,
+                                char* normalized_string,
                                 void* state) {
   split_state* spl_state = (split_state*)state;
   
@@ -60,10 +60,11 @@ static void split_dline_iter_fn(dline_entry* entry,
    * dline, not the full global string
    */
   upsert_state u_state = {entry->global_ptr, 0, UPSERT_MODE_INSERT};
+  string_data string_data =
+    {GLOBAL_STR(entry->global_ptr), normalized_string, entry->len};
   spl_state->result = trie_upsert(spl_state->new_node,
-                                  string,
+                                  &string_data,
                                   0,
-                                  entry->len,
                                   entry->score,
                                   &u_state);
 }
@@ -132,9 +133,8 @@ void trie_clean(trie_t* trie) {
 /* Apply the upsert to this trie, returning the success/error
  */
 op_result trie_upsert(trie_t* existing,
-                      char* string,
+                      string_data* string,
                       unsigned int start,
-                      unsigned int total_len,
                       int score,
                       upsert_state* state) {
   if(existing == NULL || string == NULL || state == NULL)
@@ -149,11 +149,11 @@ op_result trie_upsert(trie_t* existing,
    * 2) the hash node where this suffix goes (potentially terminating)
    * 3) an empty hash node where this suffix should go
    */
-  while(current_start < total_len && current_ptr != NULL &&
+  while(current_start < string->length && current_ptr != NULL &&
         !is_hash_node(current_ptr)) {
     parent_ptr = (trie_node*)current_ptr;
     current_ptr =
-      ((trie_node*)current_ptr)->children[(int)string[current_start]];
+      parent_ptr->children[(int)(string->normalized[current_start])];
     current_start++;
   }
   
@@ -165,7 +165,6 @@ op_result trie_upsert(trie_t* existing,
                                     &new_dline,
                                     string,
                                     current_start,
-                                    total_len,
                                     score,
                                     state);
     if(result == NO_ERROR) {
@@ -188,7 +187,7 @@ op_result trie_upsert(trie_t* existing,
       }
       
       /*set parent trie node to point to our new hash node*/
-      parent_ptr->children[(int)string[current_start-1]] =
+      parent_ptr->children[(int)(string->normalized[current_start-1])] =
         (trie_t*)((uint64_t)hash_ptr+1);
     } else if(state->mode != UPSERT_MODE_UPDATE &&
               hash_ptr->size >= HASH_NODE_SIZE_LIMIT) {
@@ -228,7 +227,7 @@ op_result trie_upsert(trie_t* existing,
       }
       
       /*set parent trie node to point to our newly split trie node*/
-      parent_ptr->children[(int)string[current_start-1]] =
+      parent_ptr->children[(int)(string->normalized[current_start-1])] =
         (trie_t*)trie_ptr;
       
       /*recursively free up the old hash node*/
@@ -241,7 +240,6 @@ op_result trie_upsert(trie_t* existing,
       return trie_upsert((trie_t*)trie_ptr,
                          string,
                          current_start,
-                         total_len,
                          score,
                          state);
     }
@@ -253,10 +251,10 @@ op_result trie_upsert(trie_t* existing,
      * it might be better to move those to a separate bucket.
      */
     uint64_t idx;
-    if(current_start == total_len) {
+    if(current_start == string->length) {
       idx = 0;
     } else {
-      idx = hash_idx(string[current_start]);
+      idx = hash_idx(string->normalized[current_start]);
     }
     
     dline_t* new_dline;
@@ -264,7 +262,6 @@ op_result trie_upsert(trie_t* existing,
                                     &new_dline,
                                     string,
                                     current_start,
-                                    total_len,
                                     score,
                                     state);
     if(result == NO_ERROR) {
@@ -282,9 +279,8 @@ op_result trie_upsert(trie_t* existing,
   * global_pointer in state after the last suffix removal
   */
 op_result trie_remove(trie_t* existing,
-                      char* string,
+                      string_data* string,
                       unsigned int start,
-                      unsigned int total_len,
                       remove_state* state) {
   if(existing == NULL || string == NULL || state == NULL)
     return BAD_PARAM;
@@ -293,9 +289,10 @@ op_result trie_remove(trie_t* existing,
   trie_t* current_ptr = existing;
   
   /*seek to the node we will remove from*/
-  while(current_start < total_len && current_ptr != NULL &&
+  while(current_start < string->length && current_ptr != NULL &&
         !is_hash_node(current_ptr)) {
-    current_ptr = ((trie_node*)current_ptr)->children[(int)string[current_start]];
+    current_ptr = ((trie_node*)current_ptr)->children[
+      (int)(string->normalized[current_start])];
     current_start++;
   }
   
@@ -310,7 +307,6 @@ op_result trie_remove(trie_t* existing,
                                     &new_dline,
                                     string,
                                     current_start,
-                                    total_len,
                                     state);
     if(result == NO_ERROR) {
       free(((trie_node*)current_ptr)->terminated);
@@ -325,10 +321,10 @@ op_result trie_remove(trie_t* existing,
     hash_node* hash_ptr = (hash_node*)((uint64_t)current_ptr-1);
     
     uint64_t idx;
-    if(current_start == total_len) {
+    if(current_start == string->length) {
       idx = 0;
     } else {
-      idx = hash_idx(string[current_start]);
+      idx = hash_idx(string->normalized[current_start]);
     }
     
     dline_t* new_dline;
@@ -336,7 +332,6 @@ op_result trie_remove(trie_t* existing,
                                     &new_dline,
                                     string,
                                     current_start,
-                                    total_len,
                                     state);
     if(result == NO_ERROR) {
       free(hash_ptr->entries[idx]);
@@ -424,9 +419,8 @@ static int merge(result_entry* s1,
  * Stores at most results_len results in to, returning the number stored.
  */
 static int hash_node_search(hash_node* node,
-                            char* string,
+                            string_data* string,
                             unsigned int start,
-                            unsigned int total_len,
                             int min_score,
                             result_entry* from,
                             result_entry* to,
@@ -439,13 +433,12 @@ static int hash_node_search(hash_node* node,
   /* If there are any unmatched bytes, just search on the line the next byte
    * hashes to.
    */
-  if(start < total_len) {
-    uint64_t idx = hash_idx(string[start]);
+  if(start < string->length) {
+    uint64_t idx = hash_idx(string->normalized[start]);
     
     int build_size = dline_search(node->entries[idx],
                                   string,
                                   start,
-                                  total_len,
                                   min_score,
                                   spare,
                                   results_len);
@@ -460,7 +453,6 @@ static int hash_node_search(hash_node* node,
   int built_size = dline_search(node->entries[0],
                                 string,
                                 start,
-                                total_len,
                                 min_score,
                                 to,
                                 results_len);
@@ -484,7 +476,6 @@ static int hash_node_search(hash_node* node,
       int to_size = dline_search(node->entries[i],
                                  string,
                                  start,
-                                 total_len,
                                  min_score,
                                  to,
                                  results_len);
@@ -525,9 +516,8 @@ static int hash_node_search(hash_node* node,
  * and thus all entries must be recursively returned.
  */
 static int trie_fan_search(trie_t* trie,
-                           char* string,
+                           string_data* string,
                            unsigned int start,
-                           unsigned int total_len,
                            int min_score,
                            result_entry* from,
                            result_entry* to,
@@ -540,7 +530,6 @@ static int trie_fan_search(trie_t* trie,
     return hash_node_search((hash_node*)((uint64_t)trie-1),
                             string,
                             start,
-                            total_len,
                             min_score,
                             from,
                             to,
@@ -554,7 +543,6 @@ static int trie_fan_search(trie_t* trie,
     int built_size = dline_search(t_node->terminated,
                                   string,
                                   start,
-                                  total_len,
                                   min_score,
                                   spare,
                                   results_len);
@@ -575,7 +563,6 @@ static int trie_fan_search(trie_t* trie,
         built_size = trie_fan_search(t_node->children[i],
                                      string,
                                      start+1,
-                                     total_len,
                                      min_score,
                                      old_results,
                                      new_results,
@@ -608,8 +595,7 @@ static int trie_fan_search(trie_t* trie,
  * Stores at most results_len results, and returns the number stored.
  */
 int trie_search(trie_t* trie,
-                char* string,
-                unsigned int total_len,
+                string_data* string,
                 result_entry* results,
                 int results_len) {
   if(trie == NULL || string == NULL || results == NULL)
@@ -619,9 +605,10 @@ int trie_search(trie_t* trie,
   trie_t* current_ptr = trie;
   
   /* first seek down to where we need to start collecting */
-  while(current_start < total_len && current_ptr != NULL &&
+  while(current_start < string->length && current_ptr != NULL &&
         !is_hash_node(current_ptr)) {
-    current_ptr = ((trie_node*)current_ptr)->children[(int)string[current_start]];
+    current_ptr = ((trie_node*)current_ptr)->children[
+      (int)(string->normalized[current_start])];
     current_start++;
   }
   
@@ -644,7 +631,6 @@ int trie_search(trie_t* trie,
   int result = trie_fan_search(current_ptr,
                                string,
                                current_start,
-                               total_len,
                                MIN_SCORE,
                                spare1,
                                results,

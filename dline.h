@@ -19,23 +19,20 @@ void dline_iterate(dline_t* dline, void* state, dline_iter_fn function);
                    
 op_result dline_upsert(dline_t* existing,
                        dline_t** result,
-                       char* string,
+                       string_data* string,
                        unsigned int start,
-                       unsigned int total_len,
                        int score,
                        upsert_state* state);
 
 op_result dline_remove(dline_t* existing,
                        dline_t** result,
-                       char* string,
+                       string_data* string,
                        unsigned int start,
-                       unsigned int total_len,
                        remove_state* state);
 
 int dline_search(dline_t* dline,
-                 char* string,
+                 string_data* string,
                  unsigned int start,
-                 unsigned int total_len,
                  int min_score,
                  result_entry* results,
                  int result_len);
