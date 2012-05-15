@@ -2,7 +2,9 @@ TODOS
 =====
 Core functionality
 ------------------
-Non-ASCII
+Non-ASCII support
+
+proper json escaping
 Http server
 -----------
 Support put/delete APIs
