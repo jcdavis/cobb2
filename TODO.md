@@ -4,7 +4,6 @@ Core functionality
 ------------------
 Non-ASCII support
 
-proper json escaping
 Http server
 -----------
 Support put/delete APIs

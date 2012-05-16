@@ -15,6 +15,61 @@
 #define NUM_RESULTS 25
 static result_entry results[NUM_RESULTS];
 
+static uint64_t json_replace(char c, char** escaped) {
+  switch(c) {
+    case '\b':
+      *escaped = "\\b";
+      return 2;
+    case '\n':
+      *escaped = "\\n";
+      return 2;
+    case '\r':
+      *escaped = "\\r";
+      return 2;
+    case '\t':
+      *escaped = "\\t";
+      return 2;
+    case '"':
+      *escaped = "\\\"";
+      return 2;
+    case '\\':
+      *escaped = "\\\\";
+      return 2;
+    case '/':
+      *escaped = "\\/";
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+/* JSON string escaping, styled in the way of libevent's http escaping*/
+static char* json_escape(char* in) {
+  uint64_t old_len = 0;
+  uint64_t idx = 0;
+
+  while(in[idx] != '\0') {
+    char* unused = NULL;
+    old_len += json_replace(in[idx], &unused);
+    idx++;
+  }
+
+  char* buffer = malloc(old_len + 1);
+  if(buffer == NULL)
+    return NULL;
+
+  char* p = buffer;
+  for(int i = 0; i < idx; i++) {
+    char* escaped = &in[i];
+    uint64_t size = json_replace(in[i], &escaped);
+    memcpy(p, escaped, size);
+    p += size;
+  }
+  *p = '\0';
+
+  return buffer;
+}
+
 void prefix_handler(struct evhttp_request *req, void* arg) {
   struct evbuffer* ret = evbuffer_new();
   struct evkeyvalq params;
@@ -56,7 +111,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   for(int i = 0; i < len; i++) {
     int total = results[i].global_ptr->len;
     int start = total-results[i].len-results[i].offset;
-    char* encoded_string = evhttp_htmlescape(GLOBAL_STR(results[i].global_ptr));
+    char* encoded_string = json_escape(GLOBAL_STR(results[i].global_ptr));
     
     if(encoded_string == NULL) {
       evhttp_send_error(req, 500, "Server Error");
