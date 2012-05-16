@@ -57,6 +57,13 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
     int total = results[i].global_ptr->len;
     int start = total-results[i].len-results[i].offset;
     char* encoded_string = evhttp_htmlescape(GLOBAL_STR(results[i].global_ptr));
+    
+    if(encoded_string == NULL) {
+      evhttp_send_error(req, 500, "Server Error");
+      evbuffer_free(ret);
+      return;
+    }
+    
     evbuffer_add_printf(ret,
       "%s{\"str\":\"%s\",\"scr\":%d,\"st\":%d,\"len\":%d}",
       i == 0 ? "" : ",",
