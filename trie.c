@@ -449,29 +449,13 @@ static int hash_node_search(hash_node* node,
   }
   
   /* Otherwise, prefix terminates at this node, so search across all lines.
-   */
-  
-  int built_size = dline_search(node->entries[0],
-                                string,
-                                start,
-                                min_score,
-                                to,
-                                results_len);
-  
-  built_size = merge(to, built_size,
-                     from, from_size,
-                     spare, results_len);
-  
-  /* We alternate which buffer dline_search holds the results so far,
+   * We alternate which buffer dline_search holds the results so far,
    * and then merge with the results from dline_search into the other buffer
    */
-  result_entry* built = spare;
+  result_entry* built = from;
+  int built_size = from_size;
   
-  if(built_size == results_len) {
-    min_score = built[results_len-1].score;
-  }
-  
-  for(int i = 1; i < NUM_BUCKETS; i++) {
+  for(int i = 0; i < NUM_BUCKETS; i++) {
     /*for each bucket, get results & merge*/
     if(node->entries[i] != NULL) {
       int to_size = dline_search(node->entries[i],
