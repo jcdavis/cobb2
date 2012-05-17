@@ -510,9 +510,8 @@ static int hash_node_search(hash_node* node,
 
 /* Internal recursive trie search from the first node which could not
  * be seeked down further, meaning either
- * 1) The node is NULL
- * 2) The node is a hash node
- * 3) The node is a trie node either at *or below* where the string ends,
+ * 1) The node is a hash node
+ * 2) The node is a trie node either at *or below* where the string ends,
  * and thus all entries must be recursively returned.
  */
 static int trie_fan_search(trie_t* trie,
