@@ -345,7 +345,8 @@ op_result trie_remove(trie_t* existing,
 /* TODO: can do a cute hack by unioning over score+len into a uint64_t/etc
  * and then doing a single movq instead of 2 movl :)
  */
-static inline void copy_entry(result_entry* dest, result_entry* src) {
+static inline void copy_entry(result_entry* restrict dest,
+                              result_entry* restrict src) {
   dest->global_ptr = src->global_ptr;
   dest->score = src->score;
   dest->len = src->len;
@@ -354,11 +355,11 @@ static inline void copy_entry(result_entry* dest, result_entry* src) {
 
 /* Merge 2 sorted dline result lists, returning the number stored in dest.
  */
-static int merge(result_entry* s1,
+static int merge(result_entry* restrict s1,
                  int s1_num,
-                 result_entry* s2,
+                 result_entry* restrict s2,
                  int s2_num,
-                 result_entry* dest,
+                 result_entry* restrict dest,
                  int dest_len) {
   assert(s1 != NULL && s2 != NULL && dest != NULL);
   
