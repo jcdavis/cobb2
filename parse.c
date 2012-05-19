@@ -35,7 +35,7 @@ op_result normalize(char* in, int len, char** out) {
 void bit_map_init(unsigned char* map,
                   char* chars) {
   char* current = chars;
-  memset(map, 0, 32);
+  memset(map, 0, MAP_SIZE);
   while(*current != '\0') {
     map[*current>>3] |= (char)(1 << (*current & 7));
     current++;
