@@ -2,6 +2,7 @@
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/http.h>
+#include <event2/http_struct.h>
 #include <event2/keyvalq_struct.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,6 +81,12 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
 
   assert(ret != NULL);
   TAILQ_INIT(&params);
+
+  if(req->type != EVHTTP_REQ_GET) {
+    evhttp_send_error(req, 405, "must use GET for complete queries");
+    evbuffer_free(ret);
+    return;
+  }
 
   evhttp_parse_query(uri, &params);
 
