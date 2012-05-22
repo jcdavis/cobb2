@@ -41,39 +41,6 @@ int main(int argc, char** argv) {
   //parser_test();
 }
 
-void parser_test() {
-  char iline[500];
-  while(fgets(iline, 500, stdin)) {
-    char* new;
-    iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    assert(!normalize(iline, strlen(iline), &new));
-    
-    /*We don't want to match on the normalized input*/
-    char* original = malloc(strlen(iline)+1);
-    strncpy(original, iline, strlen(iline)+1);
-    
-    printf("start chars\n");
-    fgets(iline, 500, stdin);
-    unsigned char start_map[32];
-    iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    bit_map_init(start_map, iline);
-    
-    printf("middle chars\n");
-    fgets(iline, 500, stdin);
-    unsigned char mid_map[32];
-    iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    bit_map_init(mid_map, iline);
-    
-    int suffix_start = -1;
-    while((suffix_start = next_start(original, strlen(new),
-                                     start_map, mid_map,
-                                     suffix_start)) >= 0) {
-      printf("%s\n", new+suffix_start);
-    }
-    free(new);
-  }
-}
-
 void basic_test() {
   static char* string1 = "Hello World!";
   static char* string2 = "Foo Bar Baz";
@@ -141,32 +108,31 @@ void basic_test() {
 
 void file_trie_query(char* fname) {
   FILE* fp = fopen(fname, "r");
-  char iline[500]; /*please say this is enough*/
+  char iline1[500], iline2[500]; /*please say this is enough*/
   //trie_t* trie = trie_init();
   trie_t* trie = trie_presplit(32,127,2);
   int read = 0;
   
+  parser_data data;
   printf("start chars\n");
-  fgets(iline, 500, stdin);
-  unsigned char start_map[32];
-  iline[strlen(iline)-1] = '\0'; /*damn newline*/
-  bit_map_init(start_map, iline);
+  fgets(iline1, 500, stdin);
+  iline1[strlen(iline1)-1] = '\0'; /*damn newline*/
   
   printf("middle chars\n");
-  fgets(iline, 500, stdin);
-  unsigned char mid_map[32];
-  iline[strlen(iline)-1] = '\0'; /*damn newline*/
-  bit_map_init(mid_map, iline);
+  fgets(iline2, 500, stdin);
+  iline2[strlen(iline2)-1] = '\0'; /*damn newline*/
+
+  parser_data_init(&data, iline1, iline2);
   
-  while(fgets(iline, 500, fp)) {
-    iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    string_data string = {iline, NULL, strlen(iline)};
-    assert(!normalize(iline, string.length, &(string.normalized)));
+  while(fgets(iline1, 5001, fp)) {
+    iline1[strlen(iline1)-1] = '\0'; /*damn newline*/
+    string_data string = {iline1, NULL, strlen(iline1)};
+    assert(!normalize(iline1, string.length, &(string.normalized)));
 
     int suffix_start = -1;
     upsert_state state = {NULL,0,0};
-    while((suffix_start = next_start(iline, strlen(iline),
-                                     start_map, mid_map,
+    while((suffix_start = next_start(string.normalized, string.length,
+                                     &data,
                                      suffix_start)) >= 0) {
       assert(!trie_upsert(trie,
                           &string,

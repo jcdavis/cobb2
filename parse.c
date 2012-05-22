@@ -32,14 +32,22 @@ op_result normalize(char* in, int len, char** out) {
 /* Pre-set up bit maps for a null-terminated string of characters, as to avoid
  * recalculating every time next_start is called
  */
-void bit_map_init(unsigned char* map,
-                  char* chars) {
+static void bit_map_init(unsigned char* map,
+                         char* chars) {
   char* current = chars;
   memset(map, 0, MAP_SIZE);
   while(*current != '\0') {
     map[*current>>3] |= (char)(1 << (*current & 7));
     current++;
   }
+}
+
+/* Sets up bitmaps for start/middle characters*/
+void parser_data_init(parser_data* data,
+                      char* start,
+                      char* middle) {
+  bit_map_init(data->start_map, start);
+  bit_map_init(data->middle_map, middle);
 }
 
 /* Helper to do the bitwise check if a given map has a given character */
@@ -59,10 +67,9 @@ static inline int in_map(unsigned char* map, char c) {
  */
 int next_start(char* normalized,
                int len,
-               unsigned char* start_map,
-               unsigned char* middle_map,
+               parser_data* data,
                int last_token) {
-  if(normalized == NULL || start_map == NULL || middle_map == NULL)
+  if(normalized == NULL || data == NULL)
     return -2;
   int token_start = last_token < 0 ? 0 : last_token + 1;
   /* If this is the first call we start in "middle mode", where any non-middle
@@ -71,8 +78,9 @@ int next_start(char* normalized,
   int prev_middle = token_start == 0 ? 1 : 0;
 
   for(int c = token_start; c < len; c++) {
-    int is_middle = in_map(middle_map, normalized[c]);
-    if((prev_middle && !is_middle) || in_map(start_map, normalized[c])) {
+    int is_middle = in_map(data->middle_map, normalized[c]);
+    if((prev_middle && !is_middle) ||
+        in_map(data->start_map, normalized[c])) {
       return c;
     }
     prev_middle = is_middle;
