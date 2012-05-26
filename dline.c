@@ -392,9 +392,7 @@ int dline_search(dline_t* dline,
     if(current->global_ptr != last_global_ptr &&
        match_len <= current->len &&
        !memcmp(string->normalized + start, str_offset(current), match_len)) {
-      results[num_found].global_ptr = current->global_ptr;
-      results[num_found].score = current->score;
-      results[num_found].len = current->len;
+      memcpy(&results[num_found], current, sizeof(dline_entry));
       results[num_found].offset = start;
       num_found++;
       if(num_found == result_len)

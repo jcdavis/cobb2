@@ -342,15 +342,9 @@ op_result trie_remove(trie_t* existing,
   }
 }
 
-/* TODO: can do a cute hack by unioning over score+len into a uint64_t/etc
- * and then doing a single movq instead of 2 movl :)
- */
 static inline void copy_entry(result_entry* restrict dest,
                               result_entry* restrict src) {
-  dest->global_ptr = src->global_ptr;
-  dest->score = src->score;
-  dest->len = src->len;
-  dest->offset = src->offset;
+  memcpy(dest, src, sizeof(result_entry));
 }
 
 /* Merge 2 sorted dline result lists, returning the number stored in dest.
@@ -600,15 +594,9 @@ int trie_search(trie_t* trie,
     return 0;
   }
   
-  result_entry* spare1 = (result_entry*)calloc(results_len,
-                                               sizeof(result_entry));
-  if(spare1 == NULL) {
-    return 0;
-  }
-  result_entry* spare2 = (result_entry*)calloc(results_len,
-                                             sizeof(result_entry));
-  if(spare2 == NULL) {
-    free(spare1);
+  result_entry* spare = (result_entry*)calloc(2*results_len,
+                                              sizeof(result_entry));
+  if(spare == NULL) {
     return 0;
   }
 
@@ -616,14 +604,13 @@ int trie_search(trie_t* trie,
                                string,
                                current_start,
                                MIN_SCORE,
-                               spare1,
+                               spare,
                                results,
-                               spare2,
+                               &spare[results_len],
                                0,
                                results_len);
   
-  free(spare1);
-  free(spare2);
+  free(spare);
   return result;
 }
 
