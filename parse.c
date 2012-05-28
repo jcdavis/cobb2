@@ -13,19 +13,25 @@
  * TODO: leading/trailing whitespace removal, middle whitespace normalization/
  * reduction?. Also, Unicode :(
  */
-op_result normalize(char* in, int len, char** out) {
-  if(in == NULL || out == NULL)
+op_result normalize(char* in, string_data* data) {
+  if(in == NULL || data == NULL)
         return BAD_PARAM;
+
+  int len = strlen(in);
+
+  data->full = in;
+  data->length = len;
+
   /* We will add a null terminator, but only to make debugging easier. Nothing
    * otherwise actually requires it, all operations are length-based.
    */
-  *out = malloc(len+1);
-  if(*out == NULL)
+  data->normalized = malloc(len+1);
+  if(data->normalized == NULL)
     return MALLOC_FAIL;
   for(int i = 0; i < len; i++) {
-    (*out)[i] = (char)tolower(in[i]);
+    data->normalized[i] = (char)tolower(in[i]);
   }
-  (*out)[len] = '\0';
+  data->normalized[len] = '\0';
   return NO_ERROR;
 }
 
@@ -65,11 +71,10 @@ static inline int in_map(unsigned char* map, char c) {
  * 0 Is always the start of a new suffix, unless it starts with a middle
  * character, in which case the first suffix is the first non middle character
  */
-int next_start(char* normalized,
-               int len,
-               parser_data* data,
+int next_start(string_data* string,
+               parser_data* parser,
                int last_token) {
-  if(normalized == NULL || data == NULL)
+  if(string == NULL || parser == NULL)
     return -2;
   int token_start = last_token < 0 ? 0 : last_token + 1;
   /* If this is the first call we start in "middle mode", where any non-middle
@@ -77,10 +82,10 @@ int next_start(char* normalized,
    */
   int prev_middle = token_start == 0 ? 1 : 0;
 
-  for(int c = token_start; c < len; c++) {
-    int is_middle = in_map(data->middle_map, normalized[c]);
+  for(int c = token_start; c < string->length; c++) {
+    int is_middle = in_map(parser->middle_map, string->normalized[c]);
     if((prev_middle && !is_middle) ||
-        in_map(data->start_map, normalized[c])) {
+        in_map(parser->start_map, string->normalized[c])) {
       return c;
     }
     prev_middle = is_middle;

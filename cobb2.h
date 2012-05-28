@@ -6,14 +6,8 @@ typedef struct global_data {
   int len;
 } global_data;
 
-#define GLOBAL_STR(g) ((char*)g + sizeof(global_data))
 
-/* For now, the full string must have the same byte length when normalized*/
-typedef struct string_data {
-  char* full; /*full string to upsert*/
-  char* normalized; /*normalized string to be indexed*/
-  unsigned int length; /*NOT including a trailing \0*/
-} string_data;
+#define GLOBAL_STR(g) ((char*)g + sizeof(global_data))
 
 enum op_ret {
   NO_ERROR = 0,

@@ -10,12 +10,11 @@
 #include "dline.h"
 #include "http.h"
 #include "parse.h"
-#include "trie.h"
+#include "server.h"
 
 #define NUM_RESULTS 25
-static result_entry results[NUM_RESULTS];
 
-static uint64_t json_replace(char c, char** escaped) {
+static inline uint64_t json_replace(char c, char** escaped) {
   switch(c) {
     case '\b':
       *escaped = "\\b";
@@ -71,6 +70,7 @@ static char* json_escape(char* in) {
 }
 
 void prefix_handler(struct evhttp_request *req, void* arg) {
+  result_entry results[NUM_RESULTS];
   struct evbuffer* ret = evbuffer_new();
   struct evkeyvalq params;
   struct evkeyval* param;
@@ -102,8 +102,8 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   }
 
   /* This strlen is almost certainly a security bug */
-  string_data string = {full_string, NULL, strlen(full_string)};
-  assert(!normalize(full_string, string.length, &(string.normalized)));
+  string_data string;
+  assert(!normalize(full_string, &string));
 
   evhttp_add_header(evhttp_request_get_output_headers(req),
                     "Content-Type", "application/json");
@@ -112,8 +112,8 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   } else {
     evbuffer_add_printf(ret, "%s({\"results\":[", callback);
   }
-  int len = trie_search((trie_t*)arg, &string, results,
-                        NUM_RESULTS);
+
+  int len = server_search((server_t*)arg, &string, results, NUM_RESULTS);
   for(int i = 0; i < len; i++) {
     int total = results[i].global_ptr->len;
     int start = total-results[i].len-results[i].offset;
@@ -146,11 +146,10 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
 void quit_handler(struct evhttp_request* req, void* arg) {
   printf("!!!!I was told to Quit!!!!\n");
   evhttp_send_reply(req, HTTP_OK, "OK", NULL);
-  trie_clean((trie_t*)arg);
   exit(0);
 }
 
-void init_and_run(trie_t* trie, int port) {
+void init_and_run(server_t* server, int port) {
   struct event_base* base;
   struct evhttp* http;
 
@@ -160,8 +159,8 @@ void init_and_run(trie_t* trie, int port) {
   http = evhttp_new(base);
   assert(http != NULL);
 
-  evhttp_set_cb(http, "/complete", prefix_handler, (void*)trie);
-  evhttp_set_cb(http, "/admin/quit", quit_handler, (void*)trie);
+  evhttp_set_cb(http, "/complete", prefix_handler, (void*)server);
+  evhttp_set_cb(http, "/admin/quit", quit_handler, (void*)server);
 
   assert(evhttp_bind_socket_with_handle(http, "0.0.0.0", port) != NULL);
   event_base_dispatch(base);
