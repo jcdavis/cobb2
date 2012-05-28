@@ -1,7 +1,9 @@
 #ifndef _DLINE_H_
 #define _DLINE_H_
 
+#include <inttypes.h>
 #include "cobb2.h"
+#include "parse.h"
 
 #define MIN_SCORE 0
 

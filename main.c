@@ -13,6 +13,7 @@
 #include "dline.h"
 #include "http.h"
 #include "parse.h"
+#include "server.h"
 #include "trie.h"
 
 void file_dline_query(char* fname);
@@ -106,60 +107,62 @@ void basic_test() {
   free(rstate.global_ptr);
 }
 
-void file_trie_query(char* fname) {
-  FILE* fp = fopen(fname, "r");
-  char iline1[500], iline2[500]; /*please say this is enough*/
-  //trie_t* trie = trie_init();
-  trie_t* trie = trie_presplit(32,127,2);
-  int read = 0;
-  
-  parser_data data;
+void input_parse_state(parser_data* data) {
+  assert(data != NULL);
+  char sin[500], min[500];
+
   printf("start chars\n");
-  fgets(iline1, 500, stdin);
-  iline1[strlen(iline1)-1] = '\0'; /*damn newline*/
-  
+  fgets(sin, 500, stdin);
+  sin[strlen(sin)-1] = '\0'; /*damn newline*/
+
   printf("middle chars\n");
-  fgets(iline2, 500, stdin);
-  iline2[strlen(iline2)-1] = '\0'; /*damn newline*/
+  fgets(min, 500, stdin);
+  min[strlen(min)-1] = '\0'; /*damn newline*/
 
-  parser_data_init(&data, iline1, iline2);
-  
-  while(fgets(iline1, 5001, fp)) {
-    iline1[strlen(iline1)-1] = '\0'; /*damn newline*/
-    string_data string = {iline1, NULL, strlen(iline1)};
-    assert(!normalize(iline1, string.length, &(string.normalized)));
+  parser_data_init(data, sin, min);
+}
 
-    int suffix_start = -1;
-    upsert_state state = {NULL,0,0};
-    while((suffix_start = next_start(string.normalized, string.length,
-                                     &data,
-                                     suffix_start)) >= 0) {
-      assert(!trie_upsert(trie,
-                          &string,
-                          suffix_start,
-                          string.length,
-                          &state));
+void init_server(server_t* server) {
+  input_parse_state(&server->parser);
+  /* Magic numbers everywhere */
+  server->trie = trie_presplit(32, 127, 2);
+}
+
+void file_trie_query(char* fname) {
+  server_t server;
+
+  init_server(&server);  
+
+  if(fname != NULL) {
+    FILE* fp = fopen(fname, "r");
+    char iline[500]; /*please say this is enough*/
+    int read = 0;
+    while(fgets(iline, 5001, fp)) {
+      iline[strlen(iline)-1] = '\0'; /*damn newline*/
+      server_upsert(&server, iline, strlen(iline));
+      
+      if(read % 10000 == 0) {
+        printf("finished %d\n", read);
+      }
+      read++;
     }
-    free(string.normalized);
-    read++;
-    
-    if(read % 10000 == 0) {
-      printf("finished %d\n", read);
-    }
+
+    fclose(fp);
+    printf("read %d lines\n", read);
   }
-  fclose(fp);
-  
-  uint64_t size = trie_memory_usage(trie);
-  
-  printf("read %d lines into %llu bytes Query:\n", read, size);
 #if 0
-  dline_entry results[25];
+  char iline[500]; /*please say this is enough*/
+  result_entry results[25];
+
   while(fgets(iline, 500, stdin)) {
     iline[strlen(iline)-1] = '\0'; /*damn newline*/
     struct timespec ts_before;
     struct timespec ts_after;
     get_time(&ts_before);
-    int num = trie_search(trie, iline, strlen(iline), results, 25);
+    string_data string;
+
+    assert(!normalize(iline, &string));
+    int num = server_search(&server, &string, results, 25);
     get_time(&ts_after);
     for(int i = 0; i < num; i++) {
       printf("%d %p %s\n", results[i].score, (void*)(results[i].global_ptr),
@@ -174,47 +177,6 @@ void file_trie_query(char* fname) {
     
   }
 #endif
-  init_and_run(trie, 5402);
+  init_and_run(&server, 5402);
 
-}
-
-void file_dline_query(char* fname) {
-  FILE* fp = fopen(fname, "r");
-  char iline[500]; /*please say this is enough*/
-  
-  dline_t* line1 = NULL;
-  dline_t* line2 = NULL;
-  
-  int read = 0;
-  
-  while(fgets(iline, 500, fp)) {
-    upsert_state state = {NULL,0,0};
-    
-    iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    string_data stringdata = {iline, iline, strlen(iline)};
-    assert(!dline_upsert(line1,
-                         &line2,
-                         &stringdata,
-                         0,
-                         (100000-strlen(iline)),
-                         &state));
-    free(line1);
-    line1=line2;
-    read++;
-  }
-  fclose(fp);
-  
-  printf("read %d lines. Query:\n", read);
-  
-  result_entry results[25];
-  
-  while(fgets(iline, 500, stdin)) {
-    iline[strlen(iline)-1] = '\0'; /*damn newline*/
-    string_data stringdata = {iline, iline, strlen(iline)};
-    int num = dline_search(line1, &stringdata, 0, 0, results, 25);
-    for(int i = 0; i < num; i++) {
-      printf("%d %p %s\n", results[i].score, (void*)(results[i].global_ptr),
-                        GLOBAL_STR(results[i].global_ptr));
-    }
-  }
 }

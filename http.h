@@ -2,8 +2,8 @@
 #define _HTTP_H_
 
 #include "cobb2.h"
-#include "trie.h"
+#include "server.h"
 
-void init_and_run(trie_t* trie, int port);
+void init_and_run(server_t* server, int port);
 
 #endif
