@@ -88,7 +88,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
                        dline_t** result, /* resulting dline*/
                        string_data* string,/* string information */
                        unsigned int start,/*offset from start of string*/
-                       int score, /*score to set*/
+                       unsigned int score, /*score to set*/
                        upsert_state* state) {/*set on first call*/
   if(string == NULL || result == NULL || state == NULL)
     return BAD_PARAM;
@@ -375,7 +375,7 @@ op_result dline_remove(dline_t* existing,
 int dline_search(dline_t* dline,
                  string_data* string,
                  unsigned int start,
-                 int min_score,
+                 unsigned int min_score,
                  result_entry* results,
                  int result_len) {
   if(dline == NULL || string == NULL || results == NULL)

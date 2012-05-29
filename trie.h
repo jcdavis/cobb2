@@ -18,7 +18,7 @@ void trie_clean(trie_t* trie);
 op_result trie_upsert(trie_t* existing,
                       string_data* string,
                       unsigned int start,
-                      int score,
+                      unsigned int score,
                       upsert_state* state);
 
 op_result trie_remove(trie_t* existing,

@@ -1,8 +1,11 @@
 #include <assert.h>
+#include <errno.h>
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
+#include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,8 +81,9 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   char* full_string = NULL;
   char* callback = NULL;
 
-  assert(ret != NULL);
-  TAILQ_INIT(&params);
+  if(ret == NULL) {
+    evhttp_send_error(req, 500, "Server Error");
+  }
 
   if(evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
     evhttp_send_error(req, 405, "must use GET for complete");
@@ -87,6 +91,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
     return;
   }
 
+  TAILQ_INIT(&params);
   evhttp_parse_query(uri, &params);
 
   TAILQ_FOREACH(param, &params, next) {
@@ -97,6 +102,7 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   }
   if(full_string == NULL) {
     evhttp_send_error(req, 400, "Bad Syntax");
+    evhttp_clear_headers(&params);
     evbuffer_free(ret);
     return;
   }
@@ -143,6 +149,53 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
   evbuffer_free(ret);
 }
 
+void upsert_handler(struct evhttp_request *req, void* arg) {
+  struct evkeyvalq params;
+  struct evkeyval* param;
+  const char* uri = evhttp_request_get_uri(req);
+  char* phrase = NULL;
+  char* score_string = NULL;
+
+  if(evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
+    evhttp_send_error(req, 405, "must use POST for set");
+    return;
+  }
+
+  TAILQ_INIT(&params);
+  evhttp_parse_query(uri, &params);
+
+  TAILQ_FOREACH(param, &params, next) {
+    if(param->key != NULL && !strcmp(param->key, "phrase"))
+      phrase = param->value;
+    if(param->key != NULL && !strcmp(param->key, "score"))
+      score_string = param->value;
+  }
+  if(phrase == NULL || score_string == NULL) {
+    evhttp_send_error(req, 500, "Server Error");
+    evhttp_clear_headers(&params);
+    return;
+  }
+
+  char* end;
+  int64_t converted = strtoll(score_string, &end, 10);
+  if(errno == ERANGE || errno == EINVAL || *score_string == '\0' ||
+     *end != '\0' || converted < 0 || converted > ULONG_MAX) {
+    evhttp_send_error(req, 400, "unparseable score");
+    evhttp_clear_headers(&params);
+    return;
+  }
+  unsigned int score = (unsigned int)converted;
+
+  if(server_upsert((server_t*)arg, phrase, score)) {
+    evhttp_send_error(req, 500, "Server Error");
+  } else {
+    evhttp_send_reply(req, HTTP_OK, "OK", NULL);
+  }
+
+  evhttp_clear_headers(&params);
+
+}
+
 void quit_handler(struct evhttp_request* req, void* arg) {
   printf("!!!!I was told to Quit!!!!\n");
   evhttp_send_reply(req, HTTP_OK, "OK", NULL);
@@ -160,6 +213,7 @@ void init_and_run(server_t* server, int port) {
   assert(http != NULL);
 
   evhttp_set_cb(http, "/complete", prefix_handler, (void*)server);
+  evhttp_set_cb(http, "/set", upsert_handler, (void*)server);
   evhttp_set_cb(http, "/admin/quit", quit_handler, (void*)server);
 
   assert(evhttp_bind_socket_with_handle(http, "0.0.0.0", port) != NULL);

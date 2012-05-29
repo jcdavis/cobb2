@@ -23,7 +23,7 @@ op_result dline_upsert(dline_t* existing,
                        dline_t** result,
                        string_data* string,
                        unsigned int start,
-                       int score,
+                       unsigned int score,
                        upsert_state* state);
 
 op_result dline_remove(dline_t* existing,
@@ -35,7 +35,7 @@ op_result dline_remove(dline_t* existing,
 int dline_search(dline_t* dline,
                  string_data* string,
                  unsigned int start,
-                 int min_score,
+                 unsigned int min_score,
                  result_entry* results,
                  int result_len);
 

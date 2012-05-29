@@ -29,7 +29,7 @@ op_result server_upsert(server_t* server,
     res = trie_upsert(server->trie,
                       &string,
                       suffix_start,
-                      string.length,
+                      score,
                       &state);
     if(res != NO_ERROR) {
       /* There is really not a clean way of recovering from this currently,
@@ -39,6 +39,7 @@ op_result server_upsert(server_t* server,
        * TODO: its possible that a trie_remove could undo enough to fix.
        */
       fprintf(stderr, "Failed mid-attempt update, be very afraid\n");
+      free(string.normalized);
       return res;
     }
     
