@@ -398,8 +398,7 @@ static int merge(result_entry* restrict s1,
       memcpy(&dest[dest_idx], &s1[s1_idx],
              smaller*sizeof(result_entry));
       dest_idx += smaller;
-    } else {
-      assert(s2_idx < s2_num || s2_num == 0);
+    } else if (s2_idx < s2_num) {
       uint64_t smaller = MIN(dest_len-dest_idx,s2_num-s2_idx);
       memcpy(&dest[dest_idx], &s2[s2_idx],
              smaller*sizeof(result_entry));
@@ -529,8 +528,8 @@ static int trie_fan_search(trie_t* trie,
                        from, from_size,
                        to, results_len);
     
-    result_entry* old_results = to;
-    result_entry* new_results = from;
+    result_entry* old_results = from;
+    result_entry* new_results = to;
     
     if(built_size == results_len) {
       min_score = to[results_len-1].score;
@@ -538,6 +537,13 @@ static int trie_fan_search(trie_t* trie,
     
     for(int i = 0; i < 256; i++) {
       if(t_node->children[i] != NULL) {
+        if(old_results == from) {
+          new_results = from;
+          old_results = to;
+        } else {
+          new_results = to;
+          old_results = from;
+        }
         built_size = trie_fan_search(t_node->children[i],
                                      string,
                                      start+1,
@@ -547,18 +553,8 @@ static int trie_fan_search(trie_t* trie,
                                      spare,
                                      built_size,
                                      results_len);
-        if(built_size > 0) {
-          if(old_results == from) {
-            new_results = from;
-            old_results = to;
-          } else {
-            new_results = to;
-            old_results = from;
-          }
-
-          if(built_size == results_len) {
-            min_score = old_results[built_size-1].score;
-          }
+        if(built_size == results_len) {
+          min_score = new_results[built_size-1].score;
         }
       }
     }

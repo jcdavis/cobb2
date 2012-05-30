@@ -16,7 +16,6 @@
 #include "server.h"
 #include "trie.h"
 
-void file_dline_query(char* fname);
 void file_trie_query(char* fname);
 void basic_test();
 void parser_test();
@@ -37,7 +36,10 @@ static void get_time(struct timespec* ts) {
 }
 
 int main(int argc, char** argv) {
-  file_trie_query(argv[1]);
+  if(argc >= 2)
+    file_trie_query(argv[1]);
+  else
+    file_trie_query(NULL);
   //basic_test();
   //parser_test();
 }
