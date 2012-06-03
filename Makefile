@@ -1,5 +1,5 @@
 CFLAGS=-std=c99 -pedantic -Wall -O3 -g -ggdb -I/opt/local/include
-LDFLAGS=-L/opt/local/lib -levent
+LDFLAGS=-L/opt/local/lib -levent -ljemalloc
 
 all: cobb2
 
