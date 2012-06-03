@@ -3,8 +3,8 @@ LDFLAGS=-L/opt/local/lib -levent
 
 all: cobb2
 
-cobb2: dline.o http.o main.o parse.o server.o trie.o
-	gcc dline.o http.o main.o parse.o server.o trie.o -o cobb2 $(LDFLAGS)
+cobb2: cmalloc.o dline.o http.o main.o parse.o server.o trie.o
+	gcc cmalloc.o dline.o http.o main.o parse.o server.o trie.o -o cobb2 $(LDFLAGS)
 
 trie.o: trie.c
 
@@ -17,6 +17,8 @@ parse.o: parse.c
 http.o: http.c
 
 server.o: server.c
+
+cmalloc.o: cmalloc.c
 
 clean:
 	rm -f cobb2 *.o

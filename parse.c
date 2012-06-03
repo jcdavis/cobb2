@@ -1,6 +1,6 @@
 #include <ctype.h>
-#include <stdlib.h>
 #include <string.h>
+#include "cmalloc.h"
 #include "cobb2.h"
 #include "parse.h"
 
@@ -25,7 +25,7 @@ op_result normalize(char* in, string_data* data) {
   /* We will add a null terminator, but only to make debugging easier. Nothing
    * otherwise actually requires it, all operations are length-based.
    */
-  data->normalized = malloc(len+1);
+  data->normalized = cmalloc(len+1);
   if(data->normalized == NULL)
     return MALLOC_FAIL;
   for(int i = 0; i < len; i++) {
@@ -60,6 +60,7 @@ void parser_data_init(parser_data* data,
 static inline int in_map(unsigned char* map, char c) {
   return map[((unsigned char)c) >> 3] & (1 << (c & 7));
 }
+
 /* Iterates though the string to find the next start of a suffix in a string.
  * Its like strtok/strsep, except hopefully less shitty. (no modifying the input)
  * start_map is a bit map of characters for which seeing indicates the start of a

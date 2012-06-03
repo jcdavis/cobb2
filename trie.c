@@ -1,10 +1,10 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include "dline.h"
+#include "cmalloc.h"
 #include "cobb2.h"
+#include "dline.h"
 #include "trie.h"
 
 /* Functions that operate on a trie. Every trie node has a list of suffixes
@@ -70,7 +70,7 @@ static void split_dline_iter_fn(dline_entry* entry,
 }
 
 trie_t* trie_init() {
-  trie_node* node = (trie_node*)malloc(sizeof(trie_node));
+  trie_node* node = (trie_node*)cmalloc(sizeof(trie_node));
   if(node == NULL)
     return NULL;
   node->terminated = NULL;
@@ -115,9 +115,9 @@ void trie_clean(trie_t* trie) {
     hash_node* hash_ptr = (hash_node*)((uint64_t)trie-1);
     for(int i = 0; i < NUM_BUCKETS; i++) {
       if(hash_ptr->entries[i] != NULL)
-        free(hash_ptr->entries[i]);
+        cfree(hash_ptr->entries[i]);
     }
-    free(hash_ptr);
+    cfree(hash_ptr);
   } else {
     trie_node* trie_ptr = (trie_node*)trie;
     for(int i = 0; i < 256; i++) {
@@ -125,8 +125,8 @@ void trie_clean(trie_t* trie) {
         trie_clean(trie_ptr->children[i]);
     }
     if(trie_ptr->terminated != NULL)
-      free(trie_ptr->terminated);
-    free(trie);
+      cfree(trie_ptr->terminated);
+    cfree(trie);
   }
 }
 
@@ -168,7 +168,7 @@ op_result trie_upsert(trie_t* existing,
                                     score,
                                     state);
     if(result == NO_ERROR) {
-      free(((trie_node*)current_ptr)->terminated);
+      cfree(((trie_node*)current_ptr)->terminated);
       ((trie_node*)current_ptr)->terminated = new_dline;
     }
     
@@ -177,7 +177,7 @@ op_result trie_upsert(trie_t* existing,
     /*inserting into a hash_node, create it if it doesn't exist*/
     hash_node* hash_ptr = (hash_node*)((uint64_t)current_ptr-1);
     if(current_ptr == NULL) {
-      hash_ptr = (hash_node*)malloc(sizeof(hash_node));
+      hash_ptr = (hash_node*)cmalloc(sizeof(hash_node));
       if(hash_ptr == NULL) 
         return MALLOC_FAIL;
       
@@ -265,7 +265,7 @@ op_result trie_upsert(trie_t* existing,
                                     score,
                                     state);
     if(result == NO_ERROR) {
-      free(hash_ptr->entries[idx]);
+      cfree(hash_ptr->entries[idx]);
       hash_ptr->entries[idx] = new_dline;
       
       if(state->mode != UPSERT_MODE_UPDATE)
@@ -309,7 +309,7 @@ op_result trie_remove(trie_t* existing,
                                     current_start,
                                     state);
     if(result == NO_ERROR) {
-      free(((trie_node*)current_ptr)->terminated);
+      cfree(((trie_node*)current_ptr)->terminated);
       ((trie_node*)current_ptr)->terminated = new_dline;
     }
     
@@ -334,7 +334,7 @@ op_result trie_remove(trie_t* existing,
                                     current_start,
                                     state);
     if(result == NO_ERROR) {
-      free(hash_ptr->entries[idx]);
+      cfree(hash_ptr->entries[idx]);
       hash_ptr->entries[idx] = new_dline;
       hash_ptr->size--;
     }
@@ -590,8 +590,8 @@ int trie_search(trie_t* trie,
     return 0;
   }
   
-  result_entry* spare = (result_entry*)calloc(2*results_len,
-                                              sizeof(result_entry));
+  result_entry* spare = (result_entry*)ccalloc(2*results_len,
+                                               sizeof(result_entry));
   if(spare == NULL) {
     return 0;
   }
@@ -606,7 +606,7 @@ int trie_search(trie_t* trie,
                                0,
                                results_len);
   
-  free(spare);
+  cfree(spare);
   return result;
 }
 

@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
+#include "cmalloc.h"
 #include "dline.h"
 #include "http.h"
 #include "parse.h"
@@ -56,7 +57,7 @@ static char* json_escape(char* in) {
     idx++;
   }
 
-  char* buffer = malloc(old_len + 1);
+  char* buffer = cmalloc(old_len + 1);
   if(buffer == NULL)
     return NULL;
 
@@ -138,14 +139,14 @@ void prefix_handler(struct evhttp_request *req, void* arg) {
       (int)results[i].score,
       (int)start,
       (int)(string.length));
-    free(encoded_string);
+    cfree(encoded_string);
   }
   
   evbuffer_add_printf(ret, "]}%s\n", callback != NULL ? ")" : "");
   evhttp_send_reply(req, HTTP_OK, "OK", ret);
   
   evhttp_clear_headers(&params);
-  free(string.normalized);
+  cfree(string.normalized);
   evbuffer_free(ret);
 }
 

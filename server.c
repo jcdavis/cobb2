@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "cmalloc.h"
 #include "cobb2.h"
 #include "server.h"
 
@@ -39,13 +39,13 @@ op_result server_upsert(server_t* server,
        * TODO: its possible that a trie_remove could undo enough to fix.
        */
       fprintf(stderr, "Failed mid-attempt update, be very afraid\n");
-      free(string.normalized);
+      cfree(string.normalized);
       return res;
     }
     
   }
 
-  free(string.normalized);
+  cfree(string.normalized);
   return NO_ERROR;
 }
 

@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <assert.h>
 #include <sys/time.h>
 
@@ -9,6 +8,7 @@
 #include <mach/mach.h>
 #endif
 
+#include "cmalloc.h"
 #include "cobb2.h"
 #include "dline.h"
 #include "http.h"
@@ -60,12 +60,12 @@ void basic_test() {
   
   assert(!dline_upsert(line1, &line2, &stringdata1, 2, 9000, &state1));
   assert(!dline_upsert(line2, &line1, &stringdata2, 6, 9002, &state2));
-  free(line2);
+  cfree(line2);
   assert(!dline_upsert(line1, &line2, &stringdata3, 0, 9001, &state3));
-  free(line1);
+  cfree(line1);
   //Insert a second suffix for string3 with just a single character
   assert(!dline_upsert(line2, &line1, &stringdata3, 1, 9001, &state3));
-  free(line2);
+  cfree(line2);
   line2 = line1;
   
   dline_debug(line2);
@@ -73,40 +73,40 @@ void basic_test() {
   state2.mode = UPSERT_MODE_INITIAL;
   state2.global_ptr = NULL;
   assert(!dline_upsert(line2, &line1, &stringdata2, 6, 42, &state2));
-  free(line2);
+  cfree(line2);
   dline_debug(line1);
   //and now string1 up to the top
   state1.mode = UPSERT_MODE_INITIAL;
   state1.global_ptr = NULL;
   assert(!dline_upsert(line1, &line2, &stringdata1, 2, 9005, &state1));
-  free(line1);
+  cfree(line1);
   dline_debug(line2);
   
   remove_state rstate = {NULL};
   assert(!dline_remove(line2, &line1, &stringdata2, 6, &rstate));
   assert(rstate.global_ptr == state2.global_ptr);
-  free(rstate.global_ptr);
-  free(line2);
+  cfree(rstate.global_ptr);
+  cfree(line2);
   dline_debug(line1);
   
   rstate.global_ptr = NULL;
   assert(!dline_remove(line1, &line2, &stringdata1, 2, &rstate));
   assert(rstate.global_ptr == state1.global_ptr);
-  free(rstate.global_ptr);
-  free(line1);
+  cfree(rstate.global_ptr);
+  cfree(line1);
   dline_debug(line2);
   
   rstate.global_ptr = NULL;
   assert(!dline_remove(line2, &line1, &stringdata3, 0, &rstate));
   assert(rstate.global_ptr == state3.global_ptr);
-  free(line2);
+  cfree(line2);
   dline_debug(line1);
   //remove the second suffix of string3
   assert(!dline_remove(line1, &line2, &stringdata3, 1, &rstate));
   assert(rstate.global_ptr == state3.global_ptr);
-  free(line1);
+  cfree(line1);
   dline_debug(line2);
-  free(rstate.global_ptr);
+  cfree(rstate.global_ptr);
 }
 
 void input_parse_state(parser_data* data) {

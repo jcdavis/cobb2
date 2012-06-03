@@ -1,10 +1,10 @@
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <inttypes.h>
-#include "dline.h"
+#include "cmalloc.h"
 #include "cobb2.h"
+#include "dline.h"
 
 /* Functions that operate on a data line (henceforth shortened dline).
  * The dline is the fundamental storage mechanism for data, it is used as
@@ -57,7 +57,7 @@ static inline char* str_offset(dline_entry* entry) {
 }
 
 static global_data* create_global(string_data* string) {
-  global_data* result = malloc(sizeof(global_data) + string->length + 1);
+  global_data* result = cmalloc(sizeof(global_data) + string->length + 1);
   if(result == NULL)
     return NULL;
   result->len = string->length;
@@ -103,7 +103,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     /* Create the new dline for this suffix plus space for the trailing
      * magic terminator pointer.
      */
-    *result = (dline_t*)malloc(entry_size(suffix_len) + sizeof(void*));
+    *result = (dline_t*)cmalloc(entry_size(suffix_len) + sizeof(void*));
     
     if(*result == NULL) {
       return MALLOC_FAIL;
@@ -115,7 +115,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
       state->global_ptr = create_global(string);
       
       if(state->global_ptr == NULL) {
-        free(*result);
+        cfree(*result);
         return MALLOC_FAIL;
       }
     }
@@ -222,11 +222,11 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     
     after_size = (uint64_t)current - (uint64_t)existing - before_size;
     
-    *result = (dline_t*)malloc(before_size + entry_size(suffix_len) +
-                               after_size + sizeof(void*));
+    *result = (dline_t*)cmalloc(before_size + entry_size(suffix_len) +
+                                after_size + sizeof(void*));
     
     if(*result == NULL) {
-      free(state->global_ptr);
+      cfree(state->global_ptr);
       return MALLOC_FAIL;
     }
     
@@ -281,7 +281,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
       state->mode = UPSERT_MODE_UPDATE;
       /* slightly sketchy failure handling here, should be cleaned up */
       if(update_result != MALLOC_FAIL) {
-        free(tmp);
+        cfree(tmp);
       }
     }
     
@@ -344,7 +344,7 @@ op_result dline_remove(dline_t* existing,
     return NO_ERROR;
   }
   
-  *result = (dline_t*)malloc(before_size + after_size + sizeof(void*));
+  *result = (dline_t*)cmalloc(before_size + after_size + sizeof(void*));
   
   if(*result == NULL) {
     return MALLOC_FAIL;
@@ -420,7 +420,7 @@ static void dline_debug_printer(dline_entry* entry,
    */
   dline_debug_state* debug_state = (dline_debug_state*)state;
   if(debug_state->print_contents) {
-    char* tmp = (char*)malloc(entry->len+1);
+    char* tmp = (char*)cmalloc(entry->len+1);
     assert(tmp != NULL);
     strncpy(tmp, string, entry->len);
     tmp[entry->len] = '\0';
@@ -428,7 +428,7 @@ static void dline_debug_printer(dline_entry* entry,
            entry->len,
            entry->score,
            tmp);
-    free(tmp);
+    cfree(tmp);
   }
   debug_state->size += entry_size(entry->len);
 }
