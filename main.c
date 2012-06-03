@@ -157,6 +157,8 @@ void file_trie_query(char* fname) {
     get_time(&ts_after);
     int seconds = ts_after.tv_sec-ts_before.tv_sec;
     printf("read %d lines in %ds\n", read, seconds);
+    trie_print_stats();
+    cmalloc_stats();
   }
 #if 0
   char iline[500]; /*please say this is enough*/

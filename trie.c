@@ -14,7 +14,7 @@
  * hashes to. In trie nodes, the lowest bit of each child pointer indicates
  * whether it points to a hash or trie node.
  */
-#define NUM_BUCKETS 64
+#define NUM_BUCKETS 63
 #define MIN(a,b) (a<b?a:b)
 
 typedef struct trie_node {
@@ -35,6 +35,9 @@ typedef struct split_state {
 static inline uint64_t is_hash_node(trie_t* ptr) {
   return ((uint64_t)ptr)&1;
 }
+
+static int trie_node_count = 0;
+static int hash_node_count = 0;
 
 /* Because we are doing prefix matching, we can only hash based on the first
  * byte. But yea, this is still stupid
@@ -78,6 +81,8 @@ trie_t* trie_init() {
   for(int i = 0; i < 256; i++)
     node->children[i] = NULL;
   
+  trie_node_count++;
+
   return (trie_t*)node;
 }
 
@@ -118,6 +123,7 @@ void trie_clean(trie_t* trie) {
         cfree(hash_ptr->entries[i]);
     }
     cfree(hash_ptr);
+    hash_node_count--;
   } else {
     trie_node* trie_ptr = (trie_node*)trie;
     for(int i = 0; i < 256; i++) {
@@ -127,6 +133,7 @@ void trie_clean(trie_t* trie) {
     if(trie_ptr->terminated != NULL)
       cfree(trie_ptr->terminated);
     cfree(trie);
+    trie_node_count--;
   }
 }
 
@@ -181,6 +188,7 @@ op_result trie_upsert(trie_t* existing,
       if(hash_ptr == NULL) 
         return MALLOC_FAIL;
       
+      hash_node_count++;
       hash_ptr->size = 0;
       for(int i = 0; i < NUM_BUCKETS; i++) {
         hash_ptr->entries[i] = NULL;
@@ -654,7 +662,13 @@ void trie_debug(trie_t* trie) {
   }
 }
 
-/* Calculate how how much real memory is used by a given trie
+void trie_print_stats() {
+  printf("%d trie nodes\n", trie_node_count);
+  printf("%d hash nodes\n", hash_node_count);
+}
+
+/* Calculate how how much real memory is used by a given trie.
+ * FAIL: this doesn't count global pointers!!!
  */
 uint64_t trie_memory_usage(trie_t* trie) {
   uint64_t count = 0;

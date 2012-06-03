@@ -66,6 +66,20 @@ static global_data* create_global(string_data* string) {
   return result;
 }
 
+static dline_t* dline_alloc(size_t len) {
+  if(len <= 32) {
+    return cmalloc(32);
+  } else if(len <= 64) {
+    return cmalloc(64);
+  } else if(len <= 96) {
+    return cmalloc(96);
+  } else if(len <= 128) {
+    return cmalloc(128);
+  } else {
+    return cmalloc(len);
+  }
+}
+
 /* Apply some function to each element of a dline. Brought out here so
  * caller don't need to be aware of memory layout.
  */
@@ -103,7 +117,7 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     /* Create the new dline for this suffix plus space for the trailing
      * magic terminator pointer.
      */
-    *result = (dline_t*)cmalloc(entry_size(suffix_len) + sizeof(void*));
+    *result = dline_alloc(entry_size(suffix_len) + sizeof(void*));
     
     if(*result == NULL) {
       return MALLOC_FAIL;
@@ -222,8 +236,8 @@ op_result dline_upsert(dline_t* existing, /* dline to perform upset on*/
     
     after_size = (uint64_t)current - (uint64_t)existing - before_size;
     
-    *result = (dline_t*)cmalloc(before_size + entry_size(suffix_len) +
-                                after_size + sizeof(void*));
+    *result = dline_alloc(before_size + entry_size(suffix_len) +
+                          after_size + sizeof(void*));
     
     if(*result == NULL) {
       cfree(state->global_ptr);
@@ -344,7 +358,7 @@ op_result dline_remove(dline_t* existing,
     return NO_ERROR;
   }
   
-  *result = (dline_t*)cmalloc(before_size + after_size + sizeof(void*));
+  *result = dline_alloc(before_size + after_size + sizeof(void*));
   
   if(*result == NULL) {
     return MALLOC_FAIL;
