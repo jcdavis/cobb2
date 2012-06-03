@@ -138,7 +138,11 @@ void file_trie_query(char* fname) {
   if(fname != NULL) {
     FILE* fp = fopen(fname, "r");
     char iline[500]; /*please say this is enough*/
+    struct timespec ts_before;
+    struct timespec ts_after;
     int read = 0;
+
+    get_time(&ts_before);
     while(fgets(iline, 5001, fp)) {
       iline[strlen(iline)-1] = '\0'; /*damn newline*/
       server_upsert(&server, iline, strlen(iline));
@@ -150,7 +154,9 @@ void file_trie_query(char* fname) {
     }
 
     fclose(fp);
-    printf("read %d lines\n", read);
+    get_time(&ts_after);
+    int seconds = ts_after.tv_sec-ts_before.tv_sec;
+    printf("read %d lines in %ds\n", read, seconds);
   }
 #if 0
   char iline[500]; /*please say this is enough*/
